@@ -915,10 +915,10 @@ def main():
     for data in loader:
 
         # Get the data from the loader
-        one, two, three, four, five, six, seven, eight, nine, ID, names = data
+        two, three, four, five, six, seven, eight, nine, ID, names = data
 
         # Move it to the GPUs
-        one = one.to(device)
+        # one = one.to(device)
         two = two.to(device)
         three = three.to(device)
         four = four.to(device)
@@ -929,7 +929,7 @@ def main():
         nine = nine.to(device)
 
         # Run it through the model
-        prediction = ensemble_model_v2_2(one, two, three,
+        prediction = ensemble_model_v2_2(two, three,
                                          four, five, six,
                                          seven, eight, nine)
 
@@ -950,6 +950,23 @@ def main():
             predictions_matrix_y[i, :] = prediction_array[id_count]
             ordered_labels_y[i, :] = predicted_label[id_count]
             id_count += 1
+
+    hat_df2 = pd.DataFrame({'predicted_y2_redone': predicted_label_list_y})
+    hat_df2['screen_name'] = name_list
+    hat_df2['predicted_y2_redone'] = hat_df2['predicted_y2_redone'].replace({0: 'civic/public sector',
+                                                                             1: 'distribution',
+                                                                             2: 'em',
+                                                                             3: 'media',
+                                                                             4: 'personalized'})
+    hat_df2.head()
+
+    hat_df = pd.merge(hat_df1, hat_df2, on='screen_name')
+    hat_df.head()
+
+    total_df = pd.merge(hat_df, user_tweet_df, on='screen_name')
+    total_df.head()
+
+    total_df.to_csv(output_file)
 
 
 if __name__ == '__main__':
