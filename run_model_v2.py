@@ -421,7 +421,7 @@ class Ensemble(nn.Module):
             nn.Tanh())
 
     # Forward pass method
-    def forward(self, image, numbers, screen_name,
+    def forward(self, numbers, screen_name,
                 user_name, description, tweets,
                 quoted_tweets, quoted_descr, retweet_descr):
         tweets_output = self.tweet_layer_ensemble(tweets)
