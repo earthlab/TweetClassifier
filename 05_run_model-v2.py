@@ -830,8 +830,11 @@ def main():
 
     device = torch.device("cpu")
 
-    ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=torch.device('cpu'))
-    ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=torch.device('cpu'))
+    model1 = Ensemble()
+    model2 = Ensemble()
+
+    ensemble_model_v2_1 = model1.load_state_dict(torch.load(ensemble_model_file_v2_1, map_location=torch.device('cpu')))
+    ensemble_model_v2_2 = model2.load_state_dict(torch.load(ensemble_model_file_v2_2, map_location=torch.device('cpu')))
     ensemble_model_v2_1.module.to(torch.device('cpu'))
     ensemble_model_v2_2.module.to(torch.device('cpu'))
 
