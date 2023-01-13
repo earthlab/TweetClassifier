@@ -828,7 +828,7 @@ def main():
                                                     batch_size=batch_size,
                                                     shuffle=True)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
 
     ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=torch.device('cpu'))
     ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=torch.device('cpu'))
