@@ -607,7 +607,7 @@ def main():
     numeric_columns = ['followers', 'following',
                        'max_retweets', 'avg_retweets',
                        'max_favorites', 'avg_favorites',
-                       'u_statuses_count', 'account_age',
+                       'status_count', 'account_age',
                        'approx_entropy_r100', 'approx_entropy_r1000',
                        'approx_entropy_r2000', 'approx_entropy_r500',
                        'approx_entropy_r5000', 'are_retweets_percentage',
