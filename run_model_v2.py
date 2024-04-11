@@ -326,7 +326,7 @@ def get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts
                        'max_tweet_delta', 'max_tweets_day',
                        'max_tweets_hour', 'mean_tweet_delta',
                        'min_tweet_delta', 'std_tweet_delta',
-                       'topic_variance',
+                       #'topic_variance',
                        'name_has_fire', 'name_has_gov',
                        'name_has_news', 'name_has_firefighter',
                        'name_has_emergency', 'name_has_wildland',
