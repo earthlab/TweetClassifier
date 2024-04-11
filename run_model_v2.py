@@ -310,81 +310,81 @@ def get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts
     numeric_features = df.copy()
 
     # Defining the columns of interest
-    # numeric_columns = ['followers', 'following',
-    #                    'max_retweets', 'avg_retweets',
-    #                    'max_favorites', 'avg_favorites',
-    #                    'status_count', 'account_age',
-    #                    'approx_entropy_r100', 'approx_entropy_r1000',
-    #                    'approx_entropy_r2000', 'approx_entropy_r500',
-    #                    'approx_entropy_r5000', 'are_retweets_percentage',
-    #                    'avg_tweets_day',
-    #                    'default_prof_image', 'default_theme_background',
-    #                    'entropy', 'favorites_by_user',
-    #                    'favorites_by_user_per_day',
-    #                    'geoenabled',
-    #                    'get_retweeted_percentage', 'listed_count',
-    #                    'max_tweet_delta', 'max_tweets_day',
-    #                    'max_tweets_hour', 'mean_tweet_delta',
-    #                    'min_tweet_delta', 'std_tweet_delta',
-    #                    'topic_variance',
-    #                    'name_has_fire', 'name_has_gov',
-    #                    'name_has_news', 'name_has_firefighter',
-    #                    'name_has_emergency', 'name_has_wildland',
-    #                    'name_has_wildfire', 'name_has_county',
-    #                    'name_has_disaster', 'name_has_management',
-    #                    'name_has_paramedic', 'name_has_right',
-    #                    'name_has_maga', 'name_has_journalist',
-    #                    'name_has_reporter', 'name_has_editor',
-    #                    'name_has_photographer', 'name_has_newspaper',
-    #                    'name_has_producer', 'name_has_anchor',
-    #                    'name_has_photojournalist', 'name_has_tv',
-    #                    'name_has_host', 'name_has_fm',
-    #                    'name_has_morning', 'name_has_media',
-    #                    'name_has_jobs', 'name_has_careers',
-    #                    'name_has_job', 'name_has_career',
-    #                    'name_has_romance', 'name_has_captain',
-    #                    'name_has_firefighters', 'name_has_official',
-    #                    'name_has_operations', 'name_has_prevention',
-    #                    'name_has_government', 'name_has_responder',
-    #                    'name_has_housing', 'name_has_station',
-    #                    'name_has_correspondent', 'name_has_jewelry',
-    #                    'name_has_trends', 'name_has_pio',
-    #                    'name_has_ic', 'name_has_eoc',
-    #                    'name_has_office', 'name_has_bureau',
-    #                    'name_has_police', 'name_has_pd',
-    #                    'name_has_department', 'name_has_city',
-    #                    'name_has_state', 'name_has_mayor',
-    #                    'name_has_governor', 'name_has_vost',
-    #                    'name_has_smem', 'name_has_trump',
-    #                    'screen_name_has_fire', 'screen_name_has_gov',
-    #                    'screen_name_has_news', 'screen_name_has_firefighter',
-    #                    'screen_name_has_wildland', 'screen_name_has_wildfire',
-    #                    'screen_name_has_county', 'screen_name_has_disaster',
-    #                    'screen_name_has_management', 'screen_name_has_paramedic',
-    #                    'screen_name_has_right', 'screen_name_has_maga',
-    #                    'screen_name_has_journalist', 'screen_name_has_reporter',
-    #                    'screen_name_has_editor', 'screen_name_has_photographer',
-    #                    'screen_name_has_newspaper', 'screen_name_has_producer',
-    #                    'screen_name_has_anchor', 'screen_name_has_photojournalist',
-    #                    'screen_name_has_tv', 'screen_name_has_host',
-    #                    'screen_name_has_fm', 'screen_name_has_morning',
-    #                    'screen_name_has_media', 'screen_name_has_jobs',
-    #                    'screen_name_has_careers', 'screen_name_has_job',
-    #                    'screen_name_has_career', 'screen_name_has_romance',
-    #                    'screen_name_has_captain', 'screen_name_has_firefighters',
-    #                    'screen_name_has_official', 'screen_name_has_operations',
-    #                    'screen_name_has_prevention', 'screen_name_has_government',
-    #                    'screen_name_has_responder', 'screen_name_has_housing',
-    #                    'screen_name_has_station', 'screen_name_has_correspondent',
-    #                    'screen_name_has_jewelry', 'screen_name_has_trends',
-    #                    'screen_name_has_pio', 'screen_name_has_emergency',
-    #                    'screen_name_has_ic', 'screen_name_has_eoc',
-    #                    'screen_name_has_office', 'screen_name_has_bureau',
-    #                    'screen_name_has_police', 'screen_name_has_pd',
-    #                    'screen_name_has_department', 'screen_name_has_city',
-    #                    'screen_name_has_state', 'screen_name_has_mayor',
-    #                    'screen_name_has_governor', 'screen_name_has_vost',
-    #                    'screen_name_has_smem', 'screen_name_has_trump']
+    numeric_columns = ['followers', 'following',
+                       'max_retweets', 'avg_retweets',
+                       'max_favorites', 'avg_favorites',
+                       'status_count', 'account_age',
+                       'approx_entropy_r100', 'approx_entropy_r1000',
+                       'approx_entropy_r2000', 'approx_entropy_r500',
+                       'approx_entropy_r5000', 'are_retweets_percentage',
+                       'avg_tweets_day',
+                       'default_prof_image', 'default_theme_background',
+                       'entropy', 'favorites_by_user',
+                       'favorites_by_user_per_day',
+                       'geoenabled',
+                       'get_retweeted_percentage', 'listed_count',
+                       'max_tweet_delta', 'max_tweets_day',
+                       'max_tweets_hour', 'mean_tweet_delta',
+                       'min_tweet_delta', 'std_tweet_delta',
+                       'topic_variance',
+                       'name_has_fire', 'name_has_gov',
+                       'name_has_news', 'name_has_firefighter',
+                       'name_has_emergency', 'name_has_wildland',
+                       'name_has_wildfire', 'name_has_county',
+                       'name_has_disaster', 'name_has_management',
+                       'name_has_paramedic', 'name_has_right',
+                       'name_has_maga', 'name_has_journalist',
+                       'name_has_reporter', 'name_has_editor',
+                       'name_has_photographer', 'name_has_newspaper',
+                       'name_has_producer', 'name_has_anchor',
+                       'name_has_photojournalist', 'name_has_tv',
+                       'name_has_host', 'name_has_fm',
+                       'name_has_morning', 'name_has_media',
+                       'name_has_jobs', 'name_has_careers',
+                       'name_has_job', 'name_has_career',
+                       'name_has_romance', 'name_has_captain',
+                       'name_has_firefighters', 'name_has_official',
+                       'name_has_operations', 'name_has_prevention',
+                       'name_has_government', 'name_has_responder',
+                       'name_has_housing', 'name_has_station',
+                       'name_has_correspondent', 'name_has_jewelry',
+                       'name_has_trends', 'name_has_pio',
+                       'name_has_ic', 'name_has_eoc',
+                       'name_has_office', 'name_has_bureau',
+                       'name_has_police', 'name_has_pd',
+                       'name_has_department', 'name_has_city',
+                       'name_has_state', 'name_has_mayor',
+                       'name_has_governor', 'name_has_vost',
+                       'name_has_smem', 'name_has_trump',
+                       'screen_name_has_fire', 'screen_name_has_gov',
+                       'screen_name_has_news', 'screen_name_has_firefighter',
+                       'screen_name_has_wildland', 'screen_name_has_wildfire',
+                       'screen_name_has_county', 'screen_name_has_disaster',
+                       'screen_name_has_management', 'screen_name_has_paramedic',
+                       'screen_name_has_right', 'screen_name_has_maga',
+                       'screen_name_has_journalist', 'screen_name_has_reporter',
+                       'screen_name_has_editor', 'screen_name_has_photographer',
+                       'screen_name_has_newspaper', 'screen_name_has_producer',
+                       'screen_name_has_anchor', 'screen_name_has_photojournalist',
+                       'screen_name_has_tv', 'screen_name_has_host',
+                       'screen_name_has_fm', 'screen_name_has_morning',
+                       'screen_name_has_media', 'screen_name_has_jobs',
+                       'screen_name_has_careers', 'screen_name_has_job',
+                       'screen_name_has_career', 'screen_name_has_romance',
+                       'screen_name_has_captain', 'screen_name_has_firefighters',
+                       'screen_name_has_official', 'screen_name_has_operations',
+                       'screen_name_has_prevention', 'screen_name_has_government',
+                       'screen_name_has_responder', 'screen_name_has_housing',
+                       'screen_name_has_station', 'screen_name_has_correspondent',
+                       'screen_name_has_jewelry', 'screen_name_has_trends',
+                       'screen_name_has_pio', 'screen_name_has_emergency',
+                       'screen_name_has_ic', 'screen_name_has_eoc',
+                       'screen_name_has_office', 'screen_name_has_bureau',
+                       'screen_name_has_police', 'screen_name_has_pd',
+                       'screen_name_has_department', 'screen_name_has_city',
+                       'screen_name_has_state', 'screen_name_has_mayor',
+                       'screen_name_has_governor', 'screen_name_has_vost',
+                       'screen_name_has_smem', 'screen_name_has_trump']
 
     # Adding the topic-model topic columns and adding them to the list
     # topic_columns = [str(i) for i in range(0, 50)]
@@ -759,8 +759,6 @@ def main():
 
     validation_retweet_counts = np.asarray(validation_retweet_counts).reshape(len(user_tweet_df), 1)
 
-
-
     number_scaler = load(number_scaler_file)
 
     #validation_images = get_images_and_labels(user_tweet_df, loader, pics_dir)
@@ -832,22 +830,17 @@ def main():
                                                     batch_size=batch_size,
                                                     shuffle=True)
 
-    device = torch.device("cpu")
+    if torch.cuda.is_available():
+        # Use the first available GPU
+        device = torch.device("cuda:0")
+        print("Using GPU:", torch.cuda.get_device_name(0))
+    else:
+        # Use CPU if GPUs are not available
+        device = torch.device("cpu")
+        print("Using CPU")
 
-    ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=torch.device('cpu'))
-    ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=torch.device('cpu'))
-
-    # ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=torch.device('cpu'))
-    #
-    # new_state_dict = OrderedDict()
-    # for k, v in ensemble_model_v2_1.items():
-    #     name = k[7:]  # remove `module.`
-    #     new_state_dict[name] = v
-    # # load params
-    # ensemble_model_v2_1 = model1.load_state_dict(new_state_dict)
-
-    ensemble_model_v2_1 = ensemble_model_v2_1.module.to(torch.device('cpu'))
-    ensemble_model_v2_2 = ensemble_model_v2_2.module.to(torch.device('cpu'))
+    ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=device)
+    ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=device)
 
     print('loaded models')
 
