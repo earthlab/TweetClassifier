@@ -220,7 +220,7 @@ def get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts
     numeric_columns = ['u_followers_count', 'following',
                        'max_retweets', 'avg_retweets',
                        'max_favorites', 'avg_favorites',
-                       'u_statuses_count', 'account_age',
+                       'status_count', 'account_age',
                        'approx_entropy_r100', 'approx_entropy_r1000',
                        'approx_entropy_r2000', 'approx_entropy_r500',
                        'approx_entropy_r5000', 'are_retweets_percentage',
@@ -604,7 +604,7 @@ def main():
         screen_name_has_tweet=binary_regex_indicator('tweet', 'u_name', user_tweet_df),
         screen_name_has_first=binary_regex_indicator('first', 'u_name', user_tweet_df))
 
-    numeric_columns = ['u_followers_count', 'following',
+    numeric_columns = ['followers', 'following',
                        'max_retweets', 'avg_retweets',
                        'max_favorites', 'avg_favorites',
                        'u_statuses_count', 'account_age',
@@ -622,7 +622,7 @@ def main():
                        # 'network_score', 'sentiment_score',
                        # 'temporal_score', 'user_score',
                        # 'english_score',
-                       'topic_variance',
+                       #'topic_variance',
                        'name_has_fire', 'name_has_gov',
                        'name_has_news', 'name_has_firefighter',
                        'name_has_emergency', 'name_has_wildland',
