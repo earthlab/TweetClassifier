@@ -112,3 +112,78 @@ sharded_corpus = ShardedCorpus.load(sharded_corpus_dest)
 Lda = gensim.models.ldamulticore.LdaMulticore
 # Reloadeding the Multi-CPU LDA model, requiring user input
 ldamodel = Lda.load(lda_model_path)
+
+
+# Defining function to get consistent LDA topic arrays
+def make_lda_consistent(lda_output):
+    current_lda_scores = []
+    topics_considered = []
+    for i in range(len(lda_output)):
+        topics_considered.append(lda_output[i][0])
+    for topics in range(50):
+        if (topics in topics_considered):
+            topic_index = topics_considered.index(topics)
+            current_lda_scores.append(lda_output[topic_index][1])
+        else:
+            current_lda_scores.append(0)
+    current_lda_scores_array = np.asarray(current_lda_scores)
+    return(current_lda_scores_array)
+
+tweets_df  = pd.DataFrame({'name':user_list,
+                           'tweet':tweet_list,
+                           'tweet_num':tweet_num_list})
+tweets_df = tweets_df.pivot(index = 'name',
+                            columns = 'tweet_num',
+                            values = 'tweet')
+tweets_df = tweets_df.drop(columns = 200)
+tweets_df = tweets_df.reset_index(drop = True)
+tweets_df['user'] = np.unique(user_list)
+
+def prep_new(tweet, dict_to_use):
+    phase1 = clean_tweet(tweet).split()
+    phase2 = dict_to_use.doc2bow(phase1)
+    return(phase2)
+
+# The loop which....
+for row in range(len(tweets_df)):
+    # Gettings topic scores for each tweet
+    for tweet_num in range(200):
+        current_tweet = tweets_df[tweet_num][row]
+        if (len(current_tweet) > 0):
+            current_lda_array = ldamodel[(prep_new(current_tweet,
+                                                   reloaded_dict))]
+            formatted_lda_array = make_lda_consistent(current_lda_array)
+            formatted_lda_array = formatted_lda_array.reshape(50, 1)
+            if (tweet_num == 0):
+                user_lda_matrix = formatted_lda_array
+            else:
+                user_lda_matrix = np.append(user_lda_matrix, formatted_lda_array, axis = 1)
+    # Getting topic variance / homogeneity - determined across all tweets
+    average_lda_array = np.mean(user_lda_matrix, axis = 1)
+    total_variance = 0
+    for matrix_row in range(user_lda_matrix.shape[1]):
+        current_lda_row = user_lda_matrix[:, matrix_row]
+        spread_from_average = np.sum(np.square(current_lda_row - average_lda_array))
+        total_variance += spread_from_average
+    scaled_variance = (total_variance / matrix_row)
+    # Getting top topics - determined by largest average topic values
+    one_hot_vector = np.zeros(50)
+    sorted_lda_topics = np.argsort(average_lda_array)
+    for topic_index in range(1, 11):
+        actual_topic_num = sorted_lda_topics[-1*topic_index]
+        current_topic_score = average_lda_array[actual_topic_num]
+        one_hot_vector[actual_topic_num] = current_topic_score
+    reshaped_one_hot = one_hot_vector.reshape(1, 50)
+    # Making the data frame
+    user_name = tweets_df['user'][row]
+    if row == 0:
+        lda_df = pd.DataFrame(reshaped_one_hot)
+        lda_df['topic_variance'] = scaled_variance
+        lda_df['user'] = user_name
+    else:
+        temp_df = pd.DataFrame(reshaped_one_hot)
+        temp_df['topic_variance'] = scaled_variance
+        temp_df['user'] = user_name
+        lda_df = pd.concat((lda_df, temp_df))
+
+lda_df.to_csv(output_csv)
