@@ -978,7 +978,7 @@ def get_test_train_split():
     getting_num_numeric_features.shape[1]
 
     train_numbers, number_scaler = get_numeric(train_df, 'train', 'dont matter', True, train_retweet_counts)
-    validation_numbers, _ = get_numeric(cv_df, 'validation', number_scaler, True, validation_retweet_counts)
+    validation_numbers = get_numeric(cv_df, 'validation', number_scaler, True, validation_retweet_counts)
 
     train_df = train_df.reset_index(drop=True)
 
