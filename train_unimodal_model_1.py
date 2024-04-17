@@ -379,7 +379,7 @@ def grid_search(l2_value, numeric_features, text_vectorizer, train_loader, train
 
 def get_test_train_split():
     # Read the CSV file into a dataframe
-    user_tweet_df = pd.read_csv(os.path.join(PROJ_DIR, 'data', 'PROTO_merged_orig.csv'))
+    user_tweet_df = pd.read_csv(os.path.join(PROJ_DIR, 'data', 'PROTO_merged_lda.csv'))
 
     # Drop any unnecessary columns
     # user_tweet_df = user_tweet_df.drop('unnecessary_column_name', axis=1)
