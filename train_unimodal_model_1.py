@@ -150,8 +150,6 @@ class Ensemble(nn.Module):
             nn.Linear(len(text_vectorizer.vocabulary_), 3, bias=False),
             nn.Tanh())
 
-        print(text_vectorizer.shape, 'text_vectorizer')
-
         # Part7. Quoted tweet component
         self.quoted_tweet_layer = torch.nn.Sequential(
             nn.Linear(len(text_vectorizer.vocabulary_), 3, bias=False),
