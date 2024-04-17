@@ -1249,16 +1249,16 @@ def produce_eval(ensemble_model, data_set, train_loader, train_df, validation_lo
 
 
 (train_ensemble1, train_pred1_y1, cv_pred1_y1, train_IDs1, cv_IDs1, train_scores1_y1, cv_scores1_y1,
- train_ordered_labels1_y1, cv_ordered_labels1_y1) = grid_search(1e-4, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df)
+ train_ordered_labels1_y1, cv_ordered_labels1_y1) = grid_search(1e-4, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
 
 (train_ensemble2, train_pred2_y1, cv_pred2_y1, train_IDs2, cv_IDs2, train_scores2_y1, cv_scores2_y1,
- train_ordered_labels2_y1, cv_ordered_labels2_y1) = grid_search(1e-3, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df)
+ train_ordered_labels2_y1, cv_ordered_labels2_y1) = grid_search(1e-3, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
 
 (train_ensemble3, train_pred3_y1, cv_pred3_y1, train_IDs3, cv_IDs3, train_scores3_y1, cv_scores3_y1,
- train_ordered_labels3_y1, cv_ordered_labels3_y1) = grid_search(1e-2, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df)
+ train_ordered_labels3_y1, cv_ordered_labels3_y1) = grid_search(1e-2, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
 
 (train_ensemble4, train_pred4_y1, cv_pred4_y1, train_IDs4, cv_IDs4, train_scores4_y1, cv_scores4_y1,
- train_ordered_labels4_y1, cv_ordered_labels4_y1) = grid_search(1e-1, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df)
+ train_ordered_labels4_y1, cv_ordered_labels4_y1) = grid_search(1e-1, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
 
 (train_ensemble5, train_pred5_y1, cv_pred5_y1, train_IDs5, cv_IDs5, train_scores5_y1, cv_scores5_y1,
- train_ordered_labels5_y1, cv_ordered_labels5_y1) = grid_search(1e0, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df)
+ train_ordered_labels5_y1, cv_ordered_labels5_y1) = grid_search(1e0, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
