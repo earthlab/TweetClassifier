@@ -1042,8 +1042,13 @@ def get_test_train_split():
     train_labels = Variable(torch.from_numpy(np.asarray(train_df.u_classv2_1, dtype=int)), requires_grad=False)
     validation_labels = Variable(torch.from_numpy(np.asarray(cv_df.u_classv2_1, dtype=int)), requires_grad=False)
 
-    training_set = TrainDataset(no_imbalance_df.index.tolist(), train_labels)
-    validation_set = ValidationDataset(cv_df.index.tolist(), validation_labels)
+    training_set = TrainDataset(no_imbalance_df.index.tolist(), train_labels, train_numbers, train_screennames,
+                                train_u_names, train_u_descriptions, train_tweet_word_counts, train_quoted_word_counts,
+                                train_quoted_descr_counts, train_retweeted_descr_counts)
+    validation_set = ValidationDataset(cv_df.index.tolist(), validation_labels, validation_numbers,
+                                       validation_screennames, validation_u_names, validation_u_descriptions,
+                                       validation_tweet_word_counts, validation_quoted_word_counts,
+                                       validation_quoted_descr_counts, validation_retweeted_descr_counts)
 
     batch_size = 512
 
