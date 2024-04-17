@@ -91,11 +91,11 @@ class ValidationDataset(torch.utils.data.Dataset):
         self.validation_numbers = validation_numbers
         self.validation_screennames = validation_screennames
         self.validation_u_names = validation_u_names
-        self.validation_u_description = validation_u_description
+        self.validation_u_descriptions = validation_u_description
         self.validation_tweet_word_counts = validation_tweet_word_counts
         self.validation_quoted_word_counts = validation_quoted_word_counts
         self.validation_quoted_descr_counts = validation_quoted_descr_counts
-        self.validation_retweeted_descr_count = validation_retweeted_descr_count
+        self.validation_retweeted_descr_counts = validation_retweeted_descr_count
 
     def __len__(self):
         'Denotes the total number of samples'
