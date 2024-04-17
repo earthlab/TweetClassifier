@@ -175,61 +175,61 @@ class Ensemble(nn.Module):
 
         # Forward pass method
         # Forward pass method
-        def forward(self, numbers, screen_name,
-                    user_name, description, tweets,
-                    quoted_tweets, quoted_descr, retweet_descr):
-            # Part2. Numeric forward pass for ensembling
-            numeric_layer_output_ensemble = self.numeric_layer(numbers)
+    def forward(self, numbers, screen_name,
+                user_name, description, tweets,
+                quoted_tweets, quoted_descr, retweet_descr):
+        # Part2. Numeric forward pass for ensembling
+        numeric_layer_output_ensemble = self.numeric_layer(numbers)
 
-            # Part3. User name through the char LSTM
-            user_name_output, _ = self.uname_lstm_layer(user_name)
-            # Only take the last cell state
-            user_name_output = user_name_output[:, -1, :]
+        # Part3. User name through the char LSTM
+        user_name_output, _ = self.uname_lstm_layer(user_name)
+        # Only take the last cell state
+        user_name_output = user_name_output[:, -1, :]
 
-            # Part4. Screen name through the char LSTM
-            screen_name_output, _ = self.screenname_lstm_layer(screen_name)
-            # Only take the last cell state
-            screen_name_output = screen_name_output[:, -1, :]
+        # Part4. Screen name through the char LSTM
+        screen_name_output, _ = self.screenname_lstm_layer(screen_name)
+        # Only take the last cell state
+        screen_name_output = screen_name_output[:, -1, :]
 
-            # Part5. Description forward pass
-            # Description embedding through the word LSTM
-            description_output, _ = self.descr_lstm_layer(description)
-            # Only take the last cell state
-            description_output = description_output[:, -1, :]
+        # Part5. Description forward pass
+        # Description embedding through the word LSTM
+        description_output, _ = self.descr_lstm_layer(description)
+        # Only take the last cell state
+        description_output = description_output[:, -1, :]
 
-            # Part6. Tweets forward pass
-            tweets_output = self.tweet_layer_ensemble(tweets)
+        # Part6. Tweets forward pass
+        tweets_output = self.tweet_layer_ensemble(tweets)
 
-            # Part7. Quoted tweets forward pass
-            quoted_tweet_output = self.quoted_tweet_layer(quoted_tweets)
+        # Part7. Quoted tweets forward pass
+        quoted_tweet_output = self.quoted_tweet_layer(quoted_tweets)
 
-            # Part8. Quoted descriptions forward pass
-            quoted_descr_output = self.quoted_descr_layer(quoted_descr)
+        # Part8. Quoted descriptions forward pass
+        quoted_descr_output = self.quoted_descr_layer(quoted_descr)
 
-            # Part9. Retweeted descriptions forward pass
-            retweet_descr_output = self.retweet_descr_layer(retweet_descr)
+        # Part9. Retweeted descriptions forward pass
+        retweet_descr_output = self.retweet_descr_layer(retweet_descr)
 
-            # Part10. Ensemble
-            # Concatenating the submodel outputs together
-            combined_input = torch.cat((numeric_layer_output_ensemble,
-                                        screen_name_output,
-                                        user_name_output,
-                                        description_output,
-                                        tweets_output,
-                                        quoted_tweet_output,
-                                        quoted_descr_output,
-                                        retweet_descr_output),
-                                       dim=1)
-            # Forward-passing them through the simple FC layer
-            supplemental_output = self.ensemble_layer(combined_input)
+        # Part10. Ensemble
+        # Concatenating the submodel outputs together
+        combined_input = torch.cat((numeric_layer_output_ensemble,
+                                    screen_name_output,
+                                    user_name_output,
+                                    description_output,
+                                    tweets_output,
+                                    quoted_tweet_output,
+                                    quoted_descr_output,
+                                    retweet_descr_output),
+                                   dim=1)
+        # Forward-passing them through the simple FC layer
+        supplemental_output = self.ensemble_layer(combined_input)
 
-            # Part11. Skipped forward pass of the numerical component
-            primary_output = self.tweet_layer_skip(tweets)
+        # Part11. Skipped forward pass of the numerical component
+        primary_output = self.tweet_layer_skip(tweets)
 
-            # Adding that 6-submodel-derived output to the primary
-            # tweet submodel output
-            final_output = torch.add(primary_output, supplemental_output)
-            return final_output
+        # Adding that 6-submodel-derived output to the primary
+        # tweet submodel output
+        final_output = torch.add(primary_output, supplemental_output)
+        return final_output
 
 
 all_chars = string.ascii_letters + '_.\"~ -/!:()|$%^&*+=[]{}<>?' + string.digits
