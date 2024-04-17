@@ -128,6 +128,8 @@ class Ensemble(nn.Module):
     def __init__(self, numeric_features, text_vectorizer):
         super(Ensemble, self).__init__()
 
+        print(numeric_features.shape, 'numeric_shape')
+
         # Part2. Numerical component
         self.numeric_layer = nn.Sequential(
             nn.Linear(numeric_features.shape[1], 3, bias=False),
@@ -148,6 +150,8 @@ class Ensemble(nn.Module):
             nn.Linear(len(text_vectorizer.vocabulary_), 3, bias=False),
             nn.Tanh())
 
+        print(text_vectorizer.shape, 'text_vectorizer')
+
         # Part7. Quoted tweet component
         self.quoted_tweet_layer = torch.nn.Sequential(
             nn.Linear(len(text_vectorizer.vocabulary_), 3, bias=False),
@@ -165,7 +169,7 @@ class Ensemble(nn.Module):
 
         # Part10. Ensemble
         self.ensemble_layer = nn.Sequential(
-            nn.Linear(27, 3, bias=False),
+            nn.Linear(24, 3, bias=False),
             nn.Tanh())
 
         # Part11. User (re)tweet component - for "skip connection"
