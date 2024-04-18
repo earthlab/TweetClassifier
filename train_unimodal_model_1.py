@@ -1243,10 +1243,10 @@ def train_model(ensemble_model, l2_value, epochs, train_loader, validation_loade
     cv_fig.plot(cv_loss_list, c='red')
     cv_fig.set_xlabel('Iteration')
     cv_fig.set_title('Validation Set')
-    cv_fig.set_ylabel('Cross Entropy Loss');
+    cv_fig.set_ylabel('Cross Entropy Loss')
 
-    plt.savefig(train_fig, os.path.join(PROJ_DIR, 'data', f'training_cross_entropy_{l2_value}.png'))
-    plt.savefig(cv_fig, os.path.join(PROJ_DIR, 'data', f'validation_cross_entropy_{l2_value}.png'))
+    train_fig.savefig(os.path.join(PROJ_DIR, 'data', f'training_cross_entropy_{l2_value}.png'))
+    cv_fig.savefig(os.path.join(PROJ_DIR, 'data', f'validation_cross_entropy_{l2_value}.png'))
 
     # Generating outputs
     return ensemble_model, loss_list, cv_loss_list
