@@ -1252,7 +1252,7 @@ def train_model(ensemble_model, l2_value, epochs, train_loader, validation_loade
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-num_epochs = 50
+num_epochs = 100
 
 train_loader, train_df, validation_loader, validation_df, numeric_features, text_vectorizer, zero_to_one_scaler, number_scaler = get_test_train_split()
 
