@@ -26,9 +26,9 @@ from sklearn.preprocessing import label_binarize
 from itertools import cycle
 from scipy import interp
 import warnings
+from joblib import dump, load
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
 
 PROJ_DIR = os.path.dirname(__file__)
 
@@ -177,6 +177,7 @@ class Ensemble(nn.Module):
 
         # Forward pass method
         # Forward pass method
+
     def forward(self, numbers, screen_name,
                 user_name, description, tweets,
                 quoted_tweets, quoted_descr, retweet_descr):
@@ -317,6 +318,80 @@ def descToTensor(description, dim=300):
     return tensor
 
 
+def produce_eval(ensemble_model, data_set, train_loader, train_df, validation_loader, cv_df, device):
+    predicted_label_list_y = []
+    true_label_list_y = []
+    ID_list = []
+
+    if data_set == 'train':
+        loader = train_loader
+        predictions_matrix_y = np.zeros((len(train_df), 3))
+        ordered_labels_y = np.zeros((len(train_df), 1))
+    elif data_set == 'cv':
+        loader = validation_loader
+        predictions_matrix_y = np.zeros((len(cv_df), 3))
+        ordered_labels_y = np.zeros((len(cv_df), 1))
+    else:
+        print('Invalid data set. Please use (1) train or (2) cv')
+
+    for data in loader:
+
+        # Get the data from the loader
+        one, two, three, four, five, six, seven, eight, nine, ID = data
+
+        # Move it to the GPUs
+        one = one.to(device)
+        two = two.to(device)
+        three = three.to(device)
+        four = four.to(device)
+        five = five.to(device)
+        six = six.to(device)
+        seven = seven.to(device)
+        eight = eight.to(device)
+
+        # Getting labels
+        true_y = nine.to(device)
+
+        # Run it through the model
+        prediction = ensemble_model(one, two, three,
+                                    four, five, six,
+                                    seven, eight)
+
+        # Convert these probabilities to the label prediction
+        prediction_array = prediction.cpu().data.numpy()
+        predicted_label = np.argmax(prediction_array, axis=1).tolist()
+        predicted_label_list_y.extend(predicted_label)
+
+        # Storing IDs for data set inspection
+        ID_list_temp = ID.cpu().data.numpy().tolist()
+        ID_list.extend(ID_list_temp)
+
+        # Get these-shuffled true labels for evaluation
+        true_label_list_y.extend(true_y.cpu().data.numpy().tolist())
+
+        id_count = 0
+        for i in ID_list_temp:
+            predictions_matrix_y[i, :] = prediction_array[id_count]
+            ordered_labels_y[i, :] = predicted_label[id_count]
+            id_count += 1
+
+    print('##### Evaluation for the... ' + data_set + ' set:')
+    print('### Y1')
+    print('\nConfusion Matrix')
+    confusion_matrix = metrics.confusion_matrix(true_label_list_y,
+                                                predicted_label_list_y)
+    print('\nAccuracy')
+    accuracy = metrics.accuracy_score(true_label_list_y,
+                                      predicted_label_list_y)
+
+    print('\nClass-specifics')
+    class_specifics = metrics.classification_report(true_label_list_y,
+                                                    predicted_label_list_y)
+
+    return (predicted_label_list_y, ID_list, predictions_matrix_y, ordered_labels_y, confusion_matrix, accuracy,
+            class_specifics)
+
+
 def pad_text_sequences(df, type_of_text):
     """PyTorch really doesn't like having a batch of different sizes, and since
        this is still early-prototyping, we're going to bad those different sizes
@@ -354,7 +429,8 @@ def pad_text_sequences(df, type_of_text):
     return padded_unsorted_sequences
 
 
-def grid_search(l2_value, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device):
+def grid_search(l2_value, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df,
+                device):
     # Initialize the model and move it to GPU
     ensemble = Ensemble(numeric_features, text_vectorizer)
     ensemble = nn.DataParallel(ensemble)
@@ -367,16 +443,18 @@ def grid_search(l2_value, numeric_features, text_vectorizer, train_loader, train
                                                      validation_loader=validation_loader)
 
     # Produce evaluations of the trained model
-    train_predictions_y, train_IDs, train_scores_y, train_ordered_labels_y = produce_eval(
+    train_predictions_y, train_IDs, train_scores_y, train_ordered_labels_y, train_confusion_matrix, train_accuracy, train_class_specifics = produce_eval(
         trained_model, 'train', train_loader, train_df, validation_loader, validation_df, device)
 
-    validation_predictions_y, validation_IDs, validation_scores_y, validation_ordered_labels_y = produce_eval(
+    (validation_predictions_y, validation_IDs, validation_scores_y, validation_ordered_labels_y,
+     validation_confusion_matrix, validation_accuracy, validation_class_specifics) = produce_eval(
         trained_model, 'cv', train_loader, train_df, validation_loader, validation_df, device)
 
     # Store the model and predictions
     return (trained_model, train_predictions_y, validation_predictions_y,
             train_IDs, validation_IDs, train_scores_y, validation_scores_y,
-            train_ordered_labels_y, validation_ordered_labels_y)
+            train_ordered_labels_y, validation_ordered_labels_y, train_confusion_matrix, train_accuracy,
+            train_class_specifics, validation_confusion_matrix, validation_accuracy, validation_class_specifics)
 
 
 def get_test_train_split():
@@ -1068,7 +1146,7 @@ def get_test_train_split():
                                                          train_retweet_counts[
                                                          random_sample.index[0]:(random_sample.index[0] + 1)])
 
-    return train_loader, train_df, validation_loader, cv_df, getting_num_numeric_features, text_vectorizer
+    return train_loader, train_df, validation_loader, cv_df, getting_num_numeric_features, text_vectorizer, zero_to_one_scaler, number_scaler
 
 
 def train_model(ensemble_model, l2_value, epochs, train_loader, validation_loader):
@@ -1174,93 +1252,36 @@ def train_model(ensemble_model, l2_value, epochs, train_loader, validation_loade
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 num_epochs = 10
 
-train_loader, train_df, validation_loader, validation_df, numeric_features, text_vectorizer = get_test_train_split()
+train_loader, train_df, validation_loader, validation_df, numeric_features, text_vectorizer, zero_to_one_scaler, number_scaler = get_test_train_split()
 
 
-def produce_eval(ensemble_model, data_set, train_loader, train_df, validation_loader, cv_df, device):
-    predicted_label_list_y = []
-    true_label_list_y = []
-    ID_list = []
+dump(text_vectorizer, os.path.join(PROJ_DIR, 'data', 'text_vectorizer-v1.joblib'))
+dump(zero_to_one_scaler, os.path.join(PROJ_DIR, 'data', 'zero_to_one_scaler_v1.joblib'))
+dump(number_scaler, os.path.join(PROJ_DIR, 'data', 'number_scaler_v1.joblib'))
 
-    if data_set == 'train':
-        loader = train_loader
-        predictions_matrix_y = np.zeros((len(train_df), 3))
-        ordered_labels_y = np.zeros((len(train_df), 1))
-    elif data_set == 'cv':
-        loader = validation_loader
-        predictions_matrix_y = np.zeros((len(cv_df), 3))
-        ordered_labels_y = np.zeros((len(cv_df), 1))
-    else:
-        print('Invalid data set. Please use (1) train or (2) cv')
+l2_values = [1e-4, 1e-3, 1e-2, 1e-1, 1]
+for l2_value in l2_values:
+    (train_ensemble1, train_pred1_y1, cv_pred1_y1, train_IDs1, cv_IDs1, train_scores1_y1, cv_scores1_y1,
+     train_ordered_labels1_y1, cv_ordered_labels1_y1, train_confusion_matrix, train_accuracy, train_class_specifics,
+     validation_confusion_matrix, validation_accuracy, validation_class_specifics) = grid_search(l2_value,
+                                                                                                 numeric_features,
+                                                                                                 text_vectorizer,
+                                                                                                 train_loader, train_df,
+                                                                                                 validation_loader,
+                                                                                                 validation_df, device)
 
-    for data in loader:
+    torch.save(train_ensemble1, os.path.join(PROJ_DIR, 'data', f'trained-model-uclassv2-1-{l2_value}.pt'))
 
-        # Get the data from the loader
-        one, two, three, four, five, six, seven, eight, nine, ID = data
+    with open(os.path.join(PROJ_DIR, f'uclassv2-1-{l2_value}-train-metrics.txt'), 'w+') as f:
+        f.write('Confusion Matrix:\n')
+        np.savetxt(f, train_confusion_matrix, fmt='%d')
+        f.write('\nAccuracy: {:.2f}\n'.format(train_accuracy))
+        f.write('\nClass-specifics:\n')
+        f.write(train_class_specifics)
 
-        # Move it to the GPUs
-        one = one.to(device)
-        two = two.to(device)
-        three = three.to(device)
-        four = four.to(device)
-        five = five.to(device)
-        six = six.to(device)
-        seven = seven.to(device)
-        eight = eight.to(device)
-
-        # Getting labels
-        true_y = nine.to(device)
-
-        # Run it through the model
-        prediction = ensemble_model(one, two, three,
-                                    four, five, six,
-                                    seven, eight)
-
-        # Convert these probabilities to the label prediction
-        prediction_array = prediction.cpu().data.numpy()
-        predicted_label = np.argmax(prediction_array, axis=1).tolist()
-        predicted_label_list_y.extend(predicted_label)
-
-        # Storing IDs for data set inspection
-        ID_list_temp = ID.cpu().data.numpy().tolist()
-        ID_list.extend(ID_list_temp)
-
-        # Get these-shuffled true labels for evaluation
-        true_label_list_y.extend(true_y.cpu().data.numpy().tolist())
-
-        id_count = 0
-        for i in ID_list_temp:
-            predictions_matrix_y[i, :] = prediction_array[id_count]
-            ordered_labels_y[i, :] = predicted_label[id_count]
-            id_count += 1
-
-    print('##### Evaluation for the... ' + data_set + ' set:')
-    print('### Y1')
-    print('\nConfusion Matrix')
-    print(metrics.confusion_matrix(true_label_list_y,
-                                   predicted_label_list_y))
-    print('\nAccuracy')
-    print(metrics.accuracy_score(true_label_list_y,
-                                 predicted_label_list_y))
-
-    print('\nClass-specifics')
-    print(metrics.classification_report(true_label_list_y,
-                                        predicted_label_list_y))
-
-    return predicted_label_list_y, ID_list, predictions_matrix_y, ordered_labels_y
-
-
-(train_ensemble1, train_pred1_y1, cv_pred1_y1, train_IDs1, cv_IDs1, train_scores1_y1, cv_scores1_y1,
- train_ordered_labels1_y1, cv_ordered_labels1_y1) = grid_search(1e-4, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
-
-(train_ensemble2, train_pred2_y1, cv_pred2_y1, train_IDs2, cv_IDs2, train_scores2_y1, cv_scores2_y1,
- train_ordered_labels2_y1, cv_ordered_labels2_y1) = grid_search(1e-3, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
-
-(train_ensemble3, train_pred3_y1, cv_pred3_y1, train_IDs3, cv_IDs3, train_scores3_y1, cv_scores3_y1,
- train_ordered_labels3_y1, cv_ordered_labels3_y1) = grid_search(1e-2, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
-
-(train_ensemble4, train_pred4_y1, cv_pred4_y1, train_IDs4, cv_IDs4, train_scores4_y1, cv_scores4_y1,
- train_ordered_labels4_y1, cv_ordered_labels4_y1) = grid_search(1e-1, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
-
-(train_ensemble5, train_pred5_y1, cv_pred5_y1, train_IDs5, cv_IDs5, train_scores5_y1, cv_scores5_y1,
- train_ordered_labels5_y1, cv_ordered_labels5_y1) = grid_search(1e0, numeric_features, text_vectorizer, train_loader, train_df, validation_loader, validation_df, device)
+    with open(os.path.join(PROJ_DIR, f'uclassv2-1-{l2_value}-validate-metrics.txt'), 'w+') as f:
+        f.write('Confusion Matrix:\n')
+        np.savetxt(f, validation_confusion_matrix, fmt='%d')
+        f.write('\nAccuracy: {:.2f}\n'.format(validation_accuracy))
+        f.write('\nClass-specifics:\n')
+        f.write(validation_class_specifics)
