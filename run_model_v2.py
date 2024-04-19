@@ -387,8 +387,8 @@ def get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts
                        'screen_name_has_smem', 'screen_name_has_trump']
 
     # Adding the topic-model topic columns and adding them to the list
-    # topic_columns = [str(i) for i in range(0, 50)]
-    # numeric_columns.extend(topic_columns)
+    topic_columns = [str(i) for i in range(0, 50)]
+    numeric_columns.extend(topic_columns)
 
     # Subsetting the dataframe with those columns
     # And converting to numpy array
