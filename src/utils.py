@@ -1,5 +1,6 @@
+import string
 import re
-
+import gensim
 
 def clean_tweet(tweet):
     """Function to perform standard tweet processing. Includes removing URLs, my
@@ -25,4 +26,4 @@ def clean_tweet(tweet):
     # Removing stop words - very common, useless words ('the', 'a', etc)
     phase7 = gensim.parsing.preprocessing.remove_stopwords(phase6)
 
-    return (phase7)
+    return phase7
