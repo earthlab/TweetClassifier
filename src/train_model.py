@@ -28,9 +28,12 @@ from scipy import interp
 import warnings
 from joblib import dump, load
 
+from src.utils import clean_tweet
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 PROJ_DIR = os.path.dirname(__file__)
+MODEL_DIR = os.path.join(PROJ_DIR, 'data', 'models')
 
 NUMERIC_COLUMNS = ['u_followers_count', 'following',
                    'max_retweets', 'avg_retweets',
@@ -194,12 +197,49 @@ class ValidationDataset(torch.utils.data.Dataset):
                 y, label)
 
 
+class InferenceDataset(torch.utils.data.Dataset):
+
+    def __init__(self, tweet_df, list_ids, inference_numbers, inference_screen_names,
+                 inference_u_names, inference_u_description, inference_tweet_word_counts,
+                 inference_quoted_word_counts, inference_quoted_descr_counts, inference_retweeted_descr_count):
+        self.tweet_df = tweet_df
+        self.list_labels = list_ids
+        self.inference_numbers = inference_numbers
+        self.inference_screen_names = inference_screen_names
+        self.inference_u_names = inference_u_names
+        self.inference_u_descriptions = inference_u_description
+        self.inference_tweet_word_counts = inference_tweet_word_counts
+        self.inference_quoted_word_counts = inference_quoted_word_counts
+        self.inference_quoted_descr_counts = inference_quoted_descr_counts
+        self.inference_retweeted_descr_counts = inference_retweeted_descr_count
+
+    def __len__(self):
+        return len(self.list_labels)
+
+    def __getitem__(self, index):
+        # Select sample
+        label = self.list_labels[index]
+
+        x_numeric = self.inference_numbers[label]
+        x_sn = self.inference_screen_names[:, label, :]
+        x_un = self.inference_u_names[:, label, :]
+        x_descr = self.inference_u_descriptions[:, label, :]
+        x_tweet_words = self.inference_tweet_word_counts[label]
+        x_quoted_tweet_words = self.inference_quoted_word_counts[label]
+        x_quoted_descr_words = self.inference_quoted_descr_counts[label]
+        x_retweet_descr_words = self.inference_retweeted_descr_counts[label]
+
+        names = self.tweet_df['screen_name'][label]
+
+        return (x_numeric, x_sn, x_un, x_descr, x_tweet_words,
+                x_quoted_tweet_words, x_quoted_descr_words, x_retweet_descr_words,
+                label, names)
+
+
 class TweetAuthorEnsemble(nn.Module):
     # Architecture
     def __init__(self, numeric_features, text_vectorizer):
         super().__init__()
-
-        print(numeric_features.shape, 'numeric_shape')
 
         # Part2. Numerical component
         self.numeric_layer = nn.Sequential(
@@ -302,23 +342,127 @@ class TweetAuthorEnsemble(nn.Module):
         return final_output
 
 
-class BaseTrain:
+class TweetTypeEnsemble(nn.Module):
+    def __init__(self, numeric_features, text_vectorizer):
+        super().__init__()
+
+        # Part2. Numerical component
+        self.numeric_layer = nn.Sequential(
+            nn.Linear(numeric_features.shape[1], 5, bias=False),
+            nn.Tanh())
+
+        # Part3. User name component
+        #        PyTorch LSTM already has a tanh
+        self.uname_lstm_layer = nn.LSTM(90, 5, num_layers=1, bias=False)
+
+        # Part4. Screen name component
+        self.screenname_lstm_layer = nn.LSTM(90, 5, num_layers=1, bias=False)
+
+        # Part5. Description component
+        self.descr_lstm_layer = nn.LSTM(300, 5, num_layers=1, bias=False)
+
+        # Part6. User (re)tweet component - for ensembling
+        self.tweet_layer_ensemble = torch.nn.Sequential(
+            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Tanh())
+
+        # Part7. Quoted tweet component
+        self.quoted_tweet_layer = torch.nn.Sequential(
+            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Tanh())
+
+        # Part8. Quoted description component
+        self.quoted_descr_layer = torch.nn.Sequential(
+            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Tanh())
+
+        # Part9. Retweeted description component
+        self.retweet_descr_layer = torch.nn.Sequential(
+            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Tanh())
+
+        # Part10. Ensemble
+        self.ensemble_layer = nn.Sequential(
+            nn.Linear(42, 5, bias=False),
+            nn.Tanh())
+
+        # Part11. User (re)tweet component - for "skip connection"
+        self.tweet_layer_skip = torch.nn.Sequential(
+            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=True),
+            nn.Sigmoid())
+
+    # Forward pass method
+    def forward(self, numbers, screen_name,
+                user_name, description, tweets,
+                quoted_tweets, quoted_descr, retweet_descr):
+        # Part2. Numeric forward pass for ensembling
+        numeric_layer_output_ensemble = self.numeric_layer(numbers)
+
+        # Part3. User name through the char LSTM
+        user_name_output, _ = self.uname_lstm_layer(user_name)
+        #        Only take the last cell state
+        user_name_output = user_name_output[:, -1, :]
+
+        # Part4. Screen name through the char LSTM
+        screen_name_output, _ = self.screenname_lstm_layer(screen_name)
+        #        Only take the last cell state
+        screen_name_output = screen_name_output[:, -1, :]
+
+        # Part5. Description forward pass
+        #        Description embedding through the word LSTM
+        description_output, _ = self.descr_lstm_layer(description)
+        #        Only take the last cell state
+        description_output = description_output[:, -1, :]
+
+        # Part6. Tweets forward pass
+        tweets_output = self.tweet_layer_ensemble(tweets)
+
+        # Part7. Quoted tweets forward pass
+        quoted_tweet_output = self.quoted_tweet_layer(quoted_tweets)
+
+        # Part8. Quoted descriptions forward pass
+        quoted_descr_output = self.quoted_descr_layer(quoted_descr)
+
+        # Part9. Retweeted descriptions forward pass
+        retweet_descr_output = self.retweet_descr_layer(retweet_descr)
+
+        # Part10. Ensemble
+        #        10.1 - Creating what we'll add to the language
+        #        Concat'ing the nine submodel outputs together
+        combined_input = torch.cat((numeric_layer_output_ensemble,
+                                    screen_name_output,
+                                    user_name_output,
+                                    description_output,
+                                    tweets_output,
+                                    quoted_tweet_output,
+                                    quoted_descr_output,
+                                    retweet_descr_output),
+                                   dim=1)
+        #        Forward-passing them through the simple FC layer
+        supplemental_output = self.ensemble_layer(combined_input)
+
+        # Part11. Skipped forward pass of the numerical component
+        primary_output = self.tweet_layer_skip(tweets)
+
+        #        Adding that 6-submodel-derived output to the primary
+        #            tweet submodel output
+        final_output = torch.add(primary_output, supplemental_output)
+        return final_output
+
+
+class Base:
     def __init__(self):
         self._all_chars = string.ascii_letters + '_.\"~ -/!:()|$%^&*+=[]{}<>?' + string.digits
         self._n_char = len(self._all_chars)
         self._fasttext_model = self._get_read_fasttext()
-
-        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
-         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = (None, None, None, None, None, None,
-                                                                                  None, None)
 
         self._device = None
         self._label_column = None
 
     @staticmethod
     def _get_read_fasttext():
-        fasttext_dir = os.path.join(PROJ_DIR, 'data')
-        fasttext_path = os.path.join(PROJ_DIR, 'data', 'wiki-news-300d-1M.vec')
+        fasttext_dir = os.path.join(PROJ_DIR, '../data', 'models')
+        fasttext_path = os.path.join(PROJ_DIR, '../data', 'models', 'wiki-news-300d-1M.vec')
 
         # download pre-trained vector if necessary
         # link from https://fasttext.cc/docs/en/supervised-models.html
@@ -383,7 +527,7 @@ class BaseTrain:
             return torch.zeros(1, 1, dim)
         tensor = torch.zeros(n_words, 1, dim)
         for i, word in enumerate(description_split):
-            tensor[i][0] = self.word_to_tensor(word)
+            tensor[i][0] = self._word_to_tensor(word)
         return tensor
 
     def _pad_text_sequences(self, df, type_of_text):
@@ -420,6 +564,155 @@ class BaseTrain:
                                                                                      sorted_index, :]
 
         return padded_unsorted_sequences
+
+    @staticmethod
+    def _get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts):
+
+        """A function to extract the numeric features from a dataframe and
+           center and scale them for proper optimization"""
+
+        # Don't remember why I did this
+        numeric_features = df.copy()
+
+        # Adding the topic-model topic columns and adding them to the list
+        topic_columns = [str(i) for i in range(0, 50)]
+        NUMERIC_COLUMNS.extend(topic_columns)
+
+        # Subsetting the dataframe with those columns
+        # And converting to numpy array
+        numeric_features = numeric_features[NUMERIC_COLUMNS]
+        numeric_features = numeric_features.values
+
+        if need_retweet_counts:
+            numeric_features = np.concatenate((numeric_features, retweet_counts), axis=1)
+
+        # Centering and scaling the data
+        # If it's the train set, fitting a new data transformer and using it
+        if data_type == 'train':
+            standardizer = MinMaxScaler()
+            scaled_numeric_features = standardizer.fit_transform(numeric_features)
+        # If it's validation data, only use the predefined data transformer
+        elif data_type == 'validation':
+            scaled_numeric_features = standardizer.transform(numeric_features)
+        else:
+            print('Incorrect data_type argument, please use (1) train or (2) validation')
+
+        # Creating a variable of specified type - FloatTensor
+        scaled_numeric_features = Variable(torch.from_numpy(scaled_numeric_features).type(torch.FloatTensor),
+                                           requires_grad=False)
+
+        # Output
+        # If its the train set, we also want the data transformer that we trained
+        if data_type == 'train':
+            return scaled_numeric_features, standardizer
+        # If its the validation, we use a predefined and unchanging data transformer
+        elif data_type == 'validation':
+            return scaled_numeric_features
+        else:
+            print('Did that first error really not throw?: Incorrect data_type argument, please use (1) train or ' \
+                  '(2) validation')
+
+    @staticmethod
+    def _get_retweet_count(natural_text):
+        natural_text = np.reshape(natural_text, [len(natural_text), ])
+        return [text.count(' RT ') for text in natural_text]
+
+    @staticmethod
+    def _clean_natural_text(natural_text):
+        # Getting all the text
+        natural_text = np.reshape(natural_text, [len(natural_text), ])
+        natural_text = np.asarray([clean_tweet(text) for text in natural_text])
+
+        return natural_text
+
+    def _create_text_vectorizer(self, natural_text):
+        clean_natural_text = self._clean_natural_text(natural_text)
+        vect = CountVectorizer(binary=True)
+        vect = vect.fit(clean_natural_text)
+        return vect
+
+    def _get_ngram_features(self, natural_text, vect):
+        """Returns sparse matrices determined by either counts or tf-idf
+           weightings. Inputs the dataframe, method, and ngram_range, then
+           outputs the vectorized train and text matrices"""
+        natural_text = self._clean_natural_text(natural_text)
+        return Variable(
+            torch.from_numpy(np.asarray(vect.transform(natural_text).todense()).astype(float)).type(torch.FloatTensor),
+            requires_grad=False
+        )
+
+    @staticmethod
+    def _binary_regex_indicator(search_string, column, df):
+        """
+        Returns a list with 0's and 1's that indicate
+            whether 'search_string' occurs in 'column' from
+            a dataframe
+            """
+        res = [1 * bool(re.search(search_string, i, re.IGNORECASE)) for i in df[column].values]
+        return res
+
+    @staticmethod
+    def _resample_df(df, label_column) -> pd.DataFrame:
+        # Find the majority class
+        majority_class = df[label_column].value_counts().idxmax()
+
+        # Create separate dataframes for minority classes
+        majority_df = df[df[label_column] == majority_class]
+        minority_dfs = [df[df[label_column] == cls] for cls in df[label_column].unique() if
+                        cls != majority_class]
+
+        # Determine target number of samples
+        target_samples = len(majority_df)
+
+        # Upsample minority classes to match the number of samples in the majority class
+        minority_upsampled = [resample(df, replace=True, n_samples=target_samples, random_state=123) for df in
+                              minority_dfs]
+
+        # Concatenate the majority class dataframe with upsampled minority class dataframes
+        return pd.concat([majority_df] + minority_upsampled)
+
+    def _add_boolean_columns_to_df(self, user_tweet_df: pd.DataFrame):
+        user_tweet_df['u_name'] = user_tweet_df['u_name'].astype(str)
+
+        keywords = [
+            'fire', 'gov', 'news', 'firefighter', 'emergency', 'wildland', 'wildfire', 'county', 'disaster',
+            'management', 'paramedic', 'right', 'maga', 'journalist', 'reporter', 'editor', 'photographer', 'newspaper',
+            'producer', 'anchor', 'photojournalist', 'tv', 'host', 'fm', 'morning', 'media', 'jobs', 'careers', 'job',
+            'career', 'romance', 'captain', 'firefighters', 'official', 'operations', 'prevention', 'government',
+            'responder', 'housing', 'station', 'correspondent', 'jewelry', 'trends', 'pio', 'ic', 'eoc', 'office',
+            'bureau', 'police', 'pd', 'department', 'city', 'state', 'mayor', 'governor', 'vost', 'smem', 'trump',
+            'politics', 'uniteblue', 'retired', 'revolution', 'ftw', 'difference', 'patriot', 'best', 'interested',
+            'understand', 'clean', 'global', 'must', 'book', 'transportation', 'defense', 'warrior', 'christian',
+            'tweet', 'first'
+        ]
+
+        for keyword in keywords:
+            user_tweet_df[f'name_has_{keyword}'] = self._binary_regex_indicator(keyword, 'u_name', user_tweet_df)
+            user_tweet_df[f'screen_name_has_{keyword}'] = self._binary_regex_indicator(keyword, 'screen_name',
+                                                                                       user_tweet_df)
+
+        return user_tweet_df
+
+    def _create_one_hot_encodings(self, df: pd.DataFrame, text_vectorizer):
+        retweet_counts = self._get_retweet_count(df['condensed_tweets'].fillna('').values)
+        tweet_word_counts = self._get_ngram_features(df['condensed_tweets'].fillna('').values, text_vectorizer)
+        train_quoted_word_counts = self._get_ngram_features(df['quoted_tweets'].fillna('').values, text_vectorizer)
+        train_retweeted_descr_counts = self._get_ngram_features(df['retweeted_descr'].fillna('').values,
+                                                                text_vectorizer)
+        train_quoted_descr_counts = self._get_ngram_features(df['quoted_descr'].fillna('').values, text_vectorizer)
+
+        return (retweet_counts, tweet_word_counts, train_quoted_word_counts, train_retweeted_descr_counts,
+                train_quoted_descr_counts)
+
+
+class TrainBase(Base):
+    def __init__(self):
+        super().__init__()
+
+        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
+         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split(
+            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_with_lda_columns.csv'))
+        )
 
     def _produce_eval(self, model, data_set):
         predicted_label_list_y = []
@@ -483,163 +776,7 @@ class BaseTrain:
         return (predicted_label_list_y, label_list, predictions_matrix_y, ordered_labels_y, confusion_matrix, accuracy,
                 class_specifics)
 
-    @staticmethod
-    def _get_numeric(df, data_type, standardizer, need_retweet_counts, retweet_counts):
-
-        """A function to extract the numeric features from a dataframe and
-           center and scale them for proper optimization"""
-
-        # Don't remember why I did this
-        numeric_features = df.copy()
-
-        # Adding the topic-model topic columns and adding them to the list
-        topic_columns = [str(i) for i in range(0, 50)]
-        NUMERIC_COLUMNS.extend(topic_columns)
-
-        # Subsetting the dataframe with those columns
-        # And converting to numpy array
-        numeric_features = numeric_features[NUMERIC_COLUMNS]
-        numeric_features = numeric_features.values
-
-        if need_retweet_counts:
-            numeric_features = np.concatenate((numeric_features, retweet_counts), axis=1)
-
-        # Centering and scaling the data
-        # If it's the train set, fitting a new data transformer and using it
-        if data_type == 'train':
-            standardizer = MinMaxScaler()
-            scaled_numeric_features = standardizer.fit_transform(numeric_features)
-        # If it's validation data, only use the predefined data transformer
-        elif data_type == 'validation':
-            scaled_numeric_features = standardizer.transform(numeric_features)
-        else:
-            print('Incorrect data_type argument, please use (1) train or (2) validation')
-
-        # Creating a variable of specified type - FloatTensor
-        scaled_numeric_features = Variable(torch.from_numpy(scaled_numeric_features).type(torch.FloatTensor),
-                                           requires_grad=False)
-
-        # Output
-        # If its the train set, we also want the data transformer that we trained
-        if data_type == 'train':
-            return scaled_numeric_features, standardizer
-        # If its the validation, we use a predefined and unchanging data transformer
-        elif data_type == 'validation':
-            return scaled_numeric_features
-        else:
-            print('Did that first error really not throw?: Incorrect data_type argument, please use (1) train or ' \
-                  '(2) validation')
-
-    @staticmethod
-    def _clean_tweet(tweet, want_retweet_count):
-
-        """Function to perform standard tweet processing. Includes removing URLs, my
-           end-of-line character, punctuation, lower casing, and recombining the rt
-           character. Inputs a str, outputs a str"""
-
-        if want_retweet_count:
-            retweet_count = tweet.count(' RT ')
-
-        # For later - to remove punctuation
-        # Setting rule to replace any punctuation chain with equal amount of white space
-        replace_punctuation = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
-
-        # Remove end-of-line character and str-ified NaN
-        phase1 = re.sub('EndOfTweet', ' ', tweet)
-        phase1 = re.sub('EndOfDescr', ' ', tweet)
-        # Remove URLs
-        phase2 = re.sub(r'http\S+', '', phase1)
-        # Remove punctuation
-        phase3 = phase2.translate(replace_punctuation)
-        # Seperate individual characters entities based on capitalization
-        phase4 = re.sub("(\w)([A-Z])", r"\1 \2", phase3)
-        # Make all characters lower case
-        phase5 = phase4.lower()
-        # Recombining the retweet indicator
-        phase6 = re.sub("r t", " rt ", phase5)
-        # Removing stop words - very common, useless words ('the', 'a', etc)
-        phase7 = remove_stopwords(phase6)
-
-        if want_retweet_count:
-            return (phase7, retweet_count)
-        else:
-            return (phase7)
-
-    def _get_and_split_ngram_features(self, natural_text, set_type, vect, want_retweet_count):
-
-        """Returns sparse matrices determined by either counts or tf-idf
-           weightings. Inputs the dataframe, method, and ngram_range, then
-           outputs the vectorized train and text matrices"""
-
-        # Getting all the text
-        natural_text = np.reshape(natural_text, [len(natural_text), ])
-
-        natural_text_list = []
-        retweet_count_list = []
-
-        # Deciding if we want retweet counts
-        # Then getting the text as cleaned numpy array and getting retweet counts - if wanted
-        if want_retweet_count:
-            for text in natural_text:
-                natural_text_item, retweet_count = self._clean_tweet(text, want_retweet_count)
-                natural_text_list.append(natural_text_item)
-                retweet_count_list.append(retweet_count)
-            natural_text = np.asarray(natural_text_list)
-        else:
-            natural_text = np.asarray([self._clean_tweet(text, want_retweet_count) for text in natural_text])
-
-        # Defining and fitting the one-hot encoding if training
-        if set_type == 'train':
-            vect = CountVectorizer(binary=True)
-            vect = vect.fit(natural_text)
-        # Getting the encoded text if not training
-        else:
-            one_hot_text = vect.transform(natural_text)
-
-        # Returning the encoder if training
-        if set_type == 'train':
-            return vect
-        # Returning the text (and counts) if not training
-        else:
-            if want_retweet_count:
-                return one_hot_text, retweet_count_list
-            else:
-                return one_hot_text
-
-    @staticmethod
-    def _binary_regex_indicator(search_string, column, df):
-        """
-        Returns a list with 0's and 1's that indicate
-            whether 'search_string' occurs in 'column' from
-            a dataframe
-            """
-        res = [1 * bool(re.search(search_string, i, re.IGNORECASE)) for i in df[column].values]
-        return res
-
-    @staticmethod
-    def _resample_df(df, label_column) -> pd.DataFrame:
-        # Find the majority class
-        majority_class = df[label_column].value_counts().idxmax()
-
-        # Create separate dataframes for minority classes
-        majority_df = df[df[label_column] == majority_class]
-        minority_dfs = [df[df[label_column] == cls] for cls in df[label_column].unique() if
-                        cls != majority_class]
-
-        # Determine target number of samples
-        target_samples = len(majority_df)
-
-        # Upsample minority classes to match the number of samples in the majority class
-        minority_upsampled = [resample(df, replace=True, n_samples=target_samples, random_state=123) for df in
-                              minority_dfs]
-
-        # Concatenate the majority class dataframe with upsampled minority class dataframes
-        return pd.concat([majority_df] + minority_upsampled)
-
-    def _get_test_train_split(self, test_size: float = 0.2):
-        # Read the CSV file into a dataframe
-        user_tweet_df = pd.read_csv(os.path.join(PROJ_DIR, 'data', 'PROTO_merged_lda.csv'))
-
+    def _get_test_train_split(self, user_tweet_df: pd.DataFrame, test_size: float = 0.2):
         # Split the dataframe into train and test sets
         user_tweet_df, validation_user_tweet_df = train_test_split(user_tweet_df, test_size=test_size,
                                                                    random_state=42)
@@ -664,7 +801,6 @@ class BaseTrain:
         user_tweet_df = user_tweet_df.reset_index(drop=True)
 
         user_tweet_df['u_classv2_1'] = user_tweet_df['u_classv2_1'].replace({'feedbased': 'feed based'})
-
         user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'em expertise': 'em'})
         user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'em related': 'em'})
         user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'polarizing': 'distribution'})
@@ -677,171 +813,11 @@ class BaseTrain:
         user_tweet_df['u_classv2_2'] = pandas_cat_2.codes
 
         pd.set_option('display.max_colwidth', -1)
-        user_tweet_df['u_name'] = user_tweet_df['u_name'].astype(str)
 
-        user_tweet_df = user_tweet_df.assign(
-            name_has_fire=self._binary_regex_indicator('fire', 'u_name', user_tweet_df),
-            name_has_gov=self._binary_regex_indicator('gov', 'u_name', user_tweet_df),
-            name_has_news=self._binary_regex_indicator('news', 'u_name', user_tweet_df),
-            name_has_firefighter=self._binary_regex_indicator('firefighter', 'u_name', user_tweet_df),
-            name_has_emergency=self._binary_regex_indicator('emergency', 'u_name', user_tweet_df),
-            name_has_wildland=self._binary_regex_indicator('wildland', 'u_name', user_tweet_df),
-            name_has_wildfire=self._binary_regex_indicator('wildfire', 'u_name', user_tweet_df),
-            name_has_county=self._binary_regex_indicator('county', 'u_name', user_tweet_df),
-            name_has_disaster=self._binary_regex_indicator('disaster', 'u_name', user_tweet_df),
-            name_has_management=self._binary_regex_indicator('management', 'u_name', user_tweet_df),
-            name_has_paramedic=self._binary_regex_indicator('paramedic', 'u_name', user_tweet_df),
-            name_has_right=self._binary_regex_indicator('right', 'u_name', user_tweet_df),
-            name_has_maga=self._binary_regex_indicator('maga', 'u_name', user_tweet_df),
-            name_has_journalist=self._binary_regex_indicator('journalist', 'u_name', user_tweet_df),
-            name_has_reporter=self._binary_regex_indicator('reporter', 'u_name', user_tweet_df),
-            name_has_editor=self._binary_regex_indicator('editor', 'u_name', user_tweet_df),
-            name_has_photographer=self._binary_regex_indicator('photographer', 'u_name', user_tweet_df),
-            name_has_newspaper=self._binary_regex_indicator('newspaper', 'u_name', user_tweet_df),
-            name_has_producer=self._binary_regex_indicator('producer', 'u_name', user_tweet_df),
-            name_has_anchor=self._binary_regex_indicator('anchor', 'u_name', user_tweet_df),
-            name_has_photojournalist=self._binary_regex_indicator('photojournalist', 'u_name', user_tweet_df),
-            name_has_tv=self._binary_regex_indicator('tv', 'u_name', user_tweet_df),
-            name_has_host=self._binary_regex_indicator('host', 'u_name', user_tweet_df),
-            name_has_fm=self._binary_regex_indicator('fm', 'u_name', user_tweet_df),
-            name_has_morning=self._binary_regex_indicator('morning', 'u_name', user_tweet_df),
-            name_has_media=self._binary_regex_indicator('media', 'u_name', user_tweet_df),
-            name_has_jobs=self._binary_regex_indicator('jobs', 'u_name', user_tweet_df),
-            name_has_careers=self._binary_regex_indicator('careers', 'u_name', user_tweet_df),
-            name_has_job=self._binary_regex_indicator('job', 'u_name', user_tweet_df),
-            name_has_career=self._binary_regex_indicator('career', 'u_name', user_tweet_df),
-            name_has_romance=self._binary_regex_indicator('romance', 'u_name', user_tweet_df),
-            name_has_captain=self._binary_regex_indicator('captain', 'u_name', user_tweet_df),
-            name_has_firefighters=self._binary_regex_indicator('firefighters', 'u_name', user_tweet_df),
-            name_has_official=self._binary_regex_indicator('official', 'u_name', user_tweet_df),
-            name_has_operations=self._binary_regex_indicator('operations', 'u_name', user_tweet_df),
-            name_has_prevention=self._binary_regex_indicator('prevention', 'u_name', user_tweet_df),
-            name_has_government=self._binary_regex_indicator('government', 'u_name', user_tweet_df),
-            name_has_responder=self._binary_regex_indicator('responder', 'u_name', user_tweet_df),
-            name_has_housing=self._binary_regex_indicator('housing', 'u_name', user_tweet_df),
-            name_has_station=self._binary_regex_indicator('station', 'u_name', user_tweet_df),
-            name_has_correspondent=self._binary_regex_indicator('correspondent', 'u_name', user_tweet_df),
-            name_has_jewelry=self._binary_regex_indicator('jewelry', 'u_name', user_tweet_df),
-            name_has_trends=self._binary_regex_indicator('trends', 'u_name', user_tweet_df),
-            name_has_pio=self._binary_regex_indicator('pio', 'u_name', user_tweet_df),
-            name_has_ic=self._binary_regex_indicator('ic', 'u_name', user_tweet_df),
-            name_has_eoc=self._binary_regex_indicator('eoc', 'u_name', user_tweet_df),
-            name_has_office=self._binary_regex_indicator('office', 'u_name', user_tweet_df),
-            name_has_bureau=self._binary_regex_indicator('bureau', 'u_name', user_tweet_df),
-            name_has_police=self._binary_regex_indicator('police', 'u_name', user_tweet_df),
-            name_has_pd=self._binary_regex_indicator('pd', 'u_name', user_tweet_df),
-            name_has_department=self._binary_regex_indicator('department', 'u_name', user_tweet_df),
-            name_has_city=self._binary_regex_indicator('city', 'u_name', user_tweet_df),
-            name_has_state=self._binary_regex_indicator('state', 'u_name', user_tweet_df),
-            name_has_mayor=self._binary_regex_indicator('mayor', 'u_name', user_tweet_df),
-            name_has_governor=self._binary_regex_indicator('governor', 'u_name', user_tweet_df),
-            name_has_vost=self._binary_regex_indicator('vost', 'u_name', user_tweet_df),
-            name_has_smem=self._binary_regex_indicator('smem', 'u_name', user_tweet_df),
-            name_has_trump=self._binary_regex_indicator('trump', 'u_name', user_tweet_df),
-            name_has_politics=self._binary_regex_indicator('politics', 'u_name', user_tweet_df),
-            name_has_uniteblue=self._binary_regex_indicator('uniteblue', 'u_name', user_tweet_df),
-            name_has_retired=self._binary_regex_indicator('retired', 'u_name', user_tweet_df),
-            name_has_revolution=self._binary_regex_indicator('revolution', 'u_name', user_tweet_df),
-            name_has_ftw=self._binary_regex_indicator('ftw', 'u_name', user_tweet_df),
-            name_has_difference=self._binary_regex_indicator('difference', 'u_name', user_tweet_df),
-            name_has_patriot=self._binary_regex_indicator('patriot', 'u_name', user_tweet_df),
-            name_has_best=self._binary_regex_indicator('best', 'u_name', user_tweet_df),
-            name_has_interested=self._binary_regex_indicator('u_name', 'screen_name', user_tweet_df),
-            name_has_understand=self._binary_regex_indicator('u_name', 'screen_name', user_tweet_df),
-            name_has_clean=self._binary_regex_indicator('clean', 'u_name', user_tweet_df),
-            name_has_global=self._binary_regex_indicator('global', 'u_name', user_tweet_df),
-            name_has_must=self._binary_regex_indicator('must', 'u_name', user_tweet_df),
-            name_has_book=self._binary_regex_indicator('book', 'u_name', user_tweet_df),
-            name_has_transportation=self._binary_regex_indicator('u_name', 'screen_name', user_tweet_df),
-            name_has_defense=self._binary_regex_indicator('defense', 'u_name', user_tweet_df),
-            name_has_warrior=self._binary_regex_indicator('warrior', 'u_name', user_tweet_df),
-            name_has_christian=self._binary_regex_indicator('christian', 'u_name', user_tweet_df),
-            name_has_tweet=self._binary_regex_indicator('tweet', 'u_name', user_tweet_df),
-            name_has_first=self._binary_regex_indicator('first', 'u_name', user_tweet_df),
-            screen_name_has_fire=self._binary_regex_indicator('fire', 'screen_name', user_tweet_df),
-            screen_name_has_gov=self._binary_regex_indicator('gov', 'screen_name', user_tweet_df),
-            screen_name_has_news=self._binary_regex_indicator('news', 'screen_name', user_tweet_df),
-            screen_name_has_firefighter=self._binary_regex_indicator('firefighter', 'screen_name', user_tweet_df),
-            screen_name_has_emergency=self._binary_regex_indicator('emergency', 'screen_name', user_tweet_df),
-            screen_name_has_wildland=self._binary_regex_indicator('wildland', 'screen_name', user_tweet_df),
-            screen_name_has_wildfire=self._binary_regex_indicator('wildfire', 'screen_name', user_tweet_df),
-            screen_name_has_county=self._binary_regex_indicator('county', 'screen_name', user_tweet_df),
-            screen_name_has_disaster=self._binary_regex_indicator('disaster', 'screen_name', user_tweet_df),
-            screen_name_has_management=self._binary_regex_indicator('management', 'screen_name', user_tweet_df),
-            screen_name_has_paramedic=self._binary_regex_indicator('paramedic', 'screen_name', user_tweet_df),
-            screen_name_has_right=self._binary_regex_indicator('right', 'screen_name', user_tweet_df),
-            screen_name_has_maga=self._binary_regex_indicator('maga', 'screen_name', user_tweet_df),
-            screen_name_has_journalist=self._binary_regex_indicator('journalist', 'screen_name', user_tweet_df),
-            screen_name_has_reporter=self._binary_regex_indicator('reporter', 'screen_name', user_tweet_df),
-            screen_name_has_editor=self._binary_regex_indicator('editor', 'screen_name', user_tweet_df),
-            screen_name_has_photographer=self._binary_regex_indicator('photographer', 'screen_name', user_tweet_df),
-            screen_name_has_newspaper=self._binary_regex_indicator('newspaper', 'screen_name', user_tweet_df),
-            screen_name_has_producer=self._binary_regex_indicator('producer', 'screen_name', user_tweet_df),
-            screen_name_has_anchor=self._binary_regex_indicator('anchor', 'screen_name', user_tweet_df),
-            screen_name_has_photojournalist=self._binary_regex_indicator('photojournalist', 'screen_name',
-                                                                         user_tweet_df),
-            screen_name_has_tv=self._binary_regex_indicator('tv', 'screen_name', user_tweet_df),
-            screen_name_has_host=self._binary_regex_indicator('host', 'screen_name', user_tweet_df),
-            screen_name_has_fm=self._binary_regex_indicator('fm', 'screen_name', user_tweet_df),
-            screen_name_has_morning=self._binary_regex_indicator('morning', 'screen_name', user_tweet_df),
-            screen_name_has_media=self._binary_regex_indicator('media', 'screen_name', user_tweet_df),
-            screen_name_has_jobs=self._binary_regex_indicator('jobs', 'screen_name', user_tweet_df),
-            screen_name_has_careers=self._binary_regex_indicator('careers', 'screen_name', user_tweet_df),
-            screen_name_has_job=self._binary_regex_indicator('job', 'screen_name', user_tweet_df),
-            screen_name_has_career=self._binary_regex_indicator('career', 'screen_name', user_tweet_df),
-            screen_name_has_romance=self._binary_regex_indicator('romance', 'screen_name', user_tweet_df),
-            screen_name_has_captain=self._binary_regex_indicator('captain', 'screen_name', user_tweet_df),
-            screen_name_has_firefighters=self._binary_regex_indicator('firefighters', 'screen_name', user_tweet_df),
-            screen_name_has_official=self._binary_regex_indicator('official', 'screen_name', user_tweet_df),
-            screen_name_has_operations=self._binary_regex_indicator('operations', 'screen_name', user_tweet_df),
-            screen_name_has_prevention=self._binary_regex_indicator('prevention', 'screen_name', user_tweet_df),
-            screen_name_has_government=self._binary_regex_indicator('government', 'screen_name', user_tweet_df),
-            screen_name_has_responder=self._binary_regex_indicator('responder', 'screen_name', user_tweet_df),
-            screen_name_has_housing=self._binary_regex_indicator('housing', 'screen_name', user_tweet_df),
-            screen_name_has_station=self._binary_regex_indicator('station', 'screen_name', user_tweet_df),
-            screen_name_has_correspondent=self._binary_regex_indicator('correspondent', 'screen_name', user_tweet_df),
-            screen_name_has_jewelry=self._binary_regex_indicator('jewelry', 'screen_name', user_tweet_df),
-            screen_name_has_trends=self._binary_regex_indicator('trends', 'screen_name', user_tweet_df),
-            screen_name_has_pio=self._binary_regex_indicator('pio', 'screen_name', user_tweet_df),
-            screen_name_has_ic=self._binary_regex_indicator('ic', 'screen_name', user_tweet_df),
-            screen_name_has_eoc=self._binary_regex_indicator('eoc', 'screen_name', user_tweet_df),
-            screen_name_has_office=self._binary_regex_indicator('office', 'screen_name', user_tweet_df),
-            screen_name_has_bureau=self._binary_regex_indicator('bureau', 'screen_name', user_tweet_df),
-            screen_name_has_police=self._binary_regex_indicator('police', 'screen_name', user_tweet_df),
-            screen_name_has_pd=self._binary_regex_indicator('pd', 'screen_name', user_tweet_df),
-            screen_name_has_department=self._binary_regex_indicator('department', 'screen_name', user_tweet_df),
-            screen_name_has_city=self._binary_regex_indicator('city', 'screen_name', user_tweet_df),
-            screen_name_has_state=self._binary_regex_indicator('state', 'screen_name', user_tweet_df),
-            screen_name_has_mayor=self._binary_regex_indicator('mayor', 'screen_name', user_tweet_df),
-            screen_name_has_governor=self._binary_regex_indicator('governor', 'screen_name', user_tweet_df),
-            screen_name_has_smem=self._binary_regex_indicator('smem', 'screen_name', user_tweet_df),
-            screen_name_has_vost=self._binary_regex_indicator('vost', 'screen_name', user_tweet_df),
-            screen_name_has_trump=self._binary_regex_indicator('trump', 'screen_name', user_tweet_df),
-            screen_name_has_politics=self._binary_regex_indicator('politics', 'screen_name', user_tweet_df),
-            screen_name_has_uniteblue=self._binary_regex_indicator('uniteblue', 'screen_name', user_tweet_df),
-            screen_name_has_retired=self._binary_regex_indicator('retired', 'screen_name', user_tweet_df),
-            screen_name_has_revolution=self._binary_regex_indicator('revolution', 'screen_name', user_tweet_df),
-            screen_name_has_ftw=self._binary_regex_indicator('ftw', 'screen_name', user_tweet_df),
-            screen_name_has_difference=self._binary_regex_indicator('difference', 'screen_name', user_tweet_df),
-            screen_name_has_patriot=self._binary_regex_indicator('patriot', 'screen_name', user_tweet_df),
-            screen_name_has_best=self._binary_regex_indicator('best', 'screen_name', user_tweet_df),
-            screen_name_has_interested=self._binary_regex_indicator('interested', 'screen_name', user_tweet_df),
-            screen_name_has_understand=self._binary_regex_indicator('understand', 'screen_name', user_tweet_df),
-            screen_name_has_clean=self._binary_regex_indicator('clean', 'screen_name', user_tweet_df),
-            screen_name_has_global=self._binary_regex_indicator('global', 'screen_name', user_tweet_df),
-            screen_name_has_must=self._binary_regex_indicator('must', 'screen_name', user_tweet_df),
-            screen_name_has_book=self._binary_regex_indicator('book', 'screen_name', user_tweet_df),
-            screen_name_has_transportation=self._binary_regex_indicator('transporation', 'screen_name', user_tweet_df),
-            screen_name_has_defense=self._binary_regex_indicator('defense', 'screen_name', user_tweet_df),
-            screen_name_has_warrior=self._binary_regex_indicator('warrior', 'screen_name', user_tweet_df),
-            screen_name_has_christian=self._binary_regex_indicator('christian', 'screen_name', user_tweet_df),
-            screen_name_has_tweet=self._binary_regex_indicator('tweet', 'screen_name', user_tweet_df),
-            screen_name_has_first=self._binary_regex_indicator('first', 'screen_name', user_tweet_df))
+        user_tweet_df = self._add_boolean_columns_to_df(user_tweet_df)
 
         user_tweet_df = user_tweet_df.dropna(subset=NUMERIC_COLUMNS)
-
         user_tweet_df = user_tweet_df.assign(has_description=1. - 1 * pd.isnull(user_tweet_df['u_description']))
-
         user_tweet_df.u_description = user_tweet_df.u_description.fillna('')
 
         train_df = user_tweet_df[user_tweet_df['set'] == 'train']
@@ -858,61 +834,14 @@ class BaseTrain:
         all_train_text = np.append(normal_tweets, (quoted_tweets, normal_descr, retweet_descr, quoted_descr))
 
         # Storing the full-vocabulary one-hot-encoder
-        text_vectorizer = self._get_and_split_ngram_features(all_train_text, 'train', 'dontmatter', False)
+        text_vectorizer = self._create_text_vectorizer(all_train_text)
 
-        # Creating all the one-hot-encodings
-        train_tweet_word_counts, train_retweet_counts = self._get_and_split_ngram_features(
-            train_df['condensed_tweets'].fillna('').values,
-            'not_train', text_vectorizer, True)
-        train_quoted_word_counts = self._get_and_split_ngram_features(train_df['quoted_tweets'].fillna('').values,
-                                                                      'not_train', text_vectorizer,
-                                                                      False)
-        train_retweeted_descr_counts = self._get_and_split_ngram_features(train_df['retweeted_descr'].fillna('').values,
-                                                                          'not_train', text_vectorizer,
-                                                                          False)
-        train_quoted_descr_counts = self._get_and_split_ngram_features(train_df['quoted_descr'].fillna('').values,
-                                                                       'not_train', text_vectorizer,
-                                                                       False)
-        validation_tweet_word_counts, validation_retweet_counts = self._get_and_split_ngram_features(
-            cv_df['condensed_tweets'].fillna('').values,
-            'not_train', text_vectorizer, True)
-        validation_quoted_word_counts = self._get_and_split_ngram_features(cv_df['quoted_tweets'].fillna('').values,
-                                                                           'not_train', text_vectorizer,
-                                                                           False)
-        validation_retweeted_descr_counts = self._get_and_split_ngram_features(
-            cv_df['retweeted_descr'].fillna('').values,
-            'not_train', text_vectorizer, False)
-        validation_quoted_descr_counts = self._get_and_split_ngram_features(cv_df['quoted_descr'].fillna('').values,
-                                                                            'not_train', text_vectorizer,
-                                                                            False)
+        (train_retweet_counts, train_tweet_word_counts, train_quoted_word_counts, train_retweeted_descr_counts,
+         train_quoted_descr_counts) = self._create_one_hot_encodings(train_df, text_vectorizer)
 
-        # Making the one-hot-encodings model-ready
-        train_tweet_word_counts = Variable(
-            torch.from_numpy(np.asarray(train_tweet_word_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        train_quoted_word_counts = Variable(
-            torch.from_numpy(np.asarray(train_quoted_word_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        train_retweeted_descr_counts = Variable(
-            torch.from_numpy(np.asarray(train_retweeted_descr_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        train_quoted_descr_counts = Variable(
-            torch.from_numpy(np.asarray(train_quoted_descr_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        validation_tweet_word_counts = Variable(
-            torch.from_numpy(np.asarray(validation_tweet_word_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        validation_quoted_word_counts = Variable(
-            torch.from_numpy(np.asarray(validation_quoted_word_counts.todense()).astype(float)).type(torch.FloatTensor),
-            requires_grad=False)
-        validation_retweeted_descr_counts = Variable(
-            torch.from_numpy(np.asarray(validation_retweeted_descr_counts.todense()).astype(float)).type(
-                torch.FloatTensor),
-            requires_grad=False)
-        validation_quoted_descr_counts = Variable(
-            torch.from_numpy(np.asarray(validation_quoted_descr_counts.todense()).astype(float)).type(
-                torch.FloatTensor),
-            requires_grad=False)
+        (validation_retweet_counts, validation_tweet_word_counts, validation_quoted_word_counts,
+         validation_retweeted_descr_counts,
+         validation_quoted_descr_counts) = self._create_one_hot_encodings(cv_df, text_vectorizer)
 
         train_retweet_counts = np.asarray(train_retweet_counts).reshape(len(train_df), 1)
         validation_retweet_counts = np.asarray(validation_retweet_counts).reshape(len(cv_df), 1)
@@ -973,7 +902,7 @@ class BaseTrain:
     def _grid_search(self, model, l2_value: float, num_epochs: int):
 
         # Train the model w/ specified hyperparameter
-        self._train_model(model, l2_value, num_epochs)
+        trained_model = self._train_model(model, l2_value, num_epochs)
 
         # Produce evaluations of the trained model
         (train_predictions_y, train_IDs, train_scores_y, train_ordered_labels_y, train_confusion_matrix, train_accuracy,
@@ -983,8 +912,8 @@ class BaseTrain:
          validation_confusion_matrix, validation_accuracy, validation_class_specifics) = self._produce_eval(model, 'cv')
 
         # Store the model and predictions
-        return (train_confusion_matrix, train_accuracy, train_class_specifics, validation_confusion_matrix,
-                validation_accuracy, validation_class_specifics)
+        return (trained_model, train_confusion_matrix, train_accuracy, train_class_specifics,
+                validation_confusion_matrix, validation_accuracy, validation_class_specifics)
 
     def _train_model(self, model, l2_value, epochs):
         loss_function = nn.CrossEntropyLoss()
@@ -1077,29 +1006,34 @@ class BaseTrain:
         cv_fig.set_title('Validation Set')
         cv_fig.set_ylabel('Cross Entropy Loss')
 
-        f.savefig(os.path.join(PROJ_DIR, 'data', f'cross_entropy_{l2_value}.png'))
+        f.savefig(os.path.join(MODEL_DIR, f'cross_entropy_{l2_value}.png'))
 
-    def output_model(self, l2_value: float, num_epochs: int):
-        dump(self._text_vectorizer, os.path.join(PROJ_DIR, 'data', f'text_vectorizer-{self._label_column}.joblib'))
-        dump(self._zero_to_one_scaler, os.path.join(PROJ_DIR, 'data',
-                                                    f'zero_to_one_scaler_{self._label_column}.joblib'))
-        dump(self._number_scaler, os.path.join(PROJ_DIR, 'data', f'number_scaler_{self._label_column}.joblib'))
+        return model
+
+    def output_model(self, model, l2_value: float, num_epochs: int):
+        model_dir = os.path.join(PROJ_DIR, f'{self._label_column}_{l2_value}')
+        os.makedirs(model_dir, exist_ok=True)
+
+        dump(self._text_vectorizer, os.path.join(model_dir, f'text_vectorizer-{self._label_column}-{l2_value}.joblib'))
+        dump(self._zero_to_one_scaler, os.path.join(model_dir,
+                                                    f'zero_to_one_scaler_{self._label_column}_{l2_value}.joblib'))
+        dump(self._number_scaler, os.path.join(model_dir, f'number_scaler_{self._label_column}_{l2_value}.joblib'))
 
         (
-            train_ensemble_1, train_confusion_matrix, train_accuracy, train_class_specifics,
+            trained_model, train_confusion_matrix, train_accuracy, train_class_specifics,
             validation_confusion_matrix, validation_accuracy, validation_class_specifics
-        ) = self._grid_search(l2_value, num_epochs)
+        ) = self._grid_search(model, l2_value, num_epochs)
 
-        torch.save(train_ensemble_1, os.path.join(PROJ_DIR, 'data', f'trained-model-{self._label_column}-{l2_value}.pt'))
+        torch.save(trained_model, os.path.join(model_dir, f'trained-model-{self._label_column}-{l2_value}.pt'))
 
-        with open(os.path.join(PROJ_DIR, f'{self._label_column}-{l2_value}-train-metrics.txt'), 'w+') as f:
+        with open(os.path.join(model_dir, f'{self._label_column}-{l2_value}-train-metrics.txt'), 'w+') as f:
             f.write('Confusion Matrix:\n')
             np.savetxt(f, train_confusion_matrix, fmt='%d')
             f.write('\nAccuracy: {:.2f}\n'.format(train_accuracy))
             f.write('\nClass-specifics:\n')
             f.write(train_class_specifics)
 
-        with open(os.path.join(PROJ_DIR, f'{self._label_column}-{l2_value}-validate-metrics.txt'), 'w+') as f:
+        with open(os.path.join(model_dir, f'{self._label_column}-{l2_value}-validate-metrics.txt'), 'w+') as f:
             f.write('Confusion Matrix:\n')
             np.savetxt(f, validation_confusion_matrix, fmt='%d')
             f.write('\nAccuracy: {:.2f}\n'.format(validation_accuracy))
@@ -1107,21 +1041,127 @@ class BaseTrain:
             f.write(validation_class_specifics)
 
 
-class TrainTweetAuthorModel(BaseTrain):
+class TrainTweetAuthorModel(TrainBase):
     def __init__(self):
         super().__init__()
         self._label_column = 'u_classv2_1'
-
-        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
-         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split()
 
     def output_model(self, l2_value: float, num_epochs: int):
         ensemble = TweetAuthorEnsemble(self._numeric_features, self._text_vectorizer)
         ensemble = nn.DataParallel(ensemble)
         ensemble.to(self._device)
 
-        super()._train_model(l2_value, num_epochs)
+        super()._train_model(ensemble, l2_value, num_epochs)
 
-class TrainTweetTypeModel(BaseTrain):
+
+class TrainTweetTypeModel(TrainBase):
     def __init__(self):
         super().__init__()
+        self._label_column = 'u_classv2_2'
+
+    def output_model(self, l2_value: float, num_epochs: int):
+        ensemble = TweetTypeEnsemble(self._numeric_features, self._text_vectorizer)
+        ensemble = nn.DataParallel(ensemble)
+        ensemble.to(self._device)
+
+        super()._train_model(ensemble, l2_value, num_epochs)
+
+
+class InferenceTweetAuthorModel(Base):
+    def __init__(self):
+        super().__init__()
+        number_scaler_file = os.path.join(MODEL_DIR, 'number_scaler.joblib')
+        self._zero_to_one_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler.joblib'))
+        ensemble_model_file_v2_1 = os.path.join(MODEL_DIR, 'trained-model-u_classv2-0.001.pt')
+        ensemble_model_file_v2_2 = os.path.join(MODEL_DIR, 'trained-model-u_classv2-0.001.pt')
+        text_vectorizer_file = os.path.join(MODEL_DIR, 'text_vectorizer.joblib')
+        self._text_vectorizer = load(text_vectorizer_file)
+        self._number_scaler = load(number_scaler_file)
+
+        self._ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=self._device)
+        self._ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=self._device)
+
+    def _create_dataset(self, user_tweet_df: pd.DataFrame):
+        (inference_retweet_counts, inference_tweet_word_counts, inference_quoted_word_counts,
+         inference_retweeted_descr_counts, inference_quoted_descr_counts) = self._create_one_hot_encodings(
+            user_tweet_df, self._text_vectorizer)
+
+        inference_retweet_counts = np.asarray(inference_retweet_counts).reshape(len(user_tweet_df), 1)
+
+        inference_numbers = self._get_numeric(user_tweet_df, 'validation', self._number_scaler,
+                                              True, inference_retweet_counts)
+
+        user_tweet_df = user_tweet_df.reset_index(drop=True)
+
+        inference_screen_names = self._pad_text_sequences(user_tweet_df, 'screen_name')
+        inference_u_names = self._pad_text_sequences(user_tweet_df, 'u_name')
+        inference_u_descriptions = self._pad_text_sequences(user_tweet_df, 'u_description')
+
+        inference_set = InferenceDataset(
+            user_tweet_df,
+            range(len(user_tweet_df)),
+            inference_numbers,
+            inference_screen_names,
+            inference_u_names,
+            inference_u_descriptions,
+            inference_tweet_word_counts,
+            inference_quoted_word_counts,
+            inference_quoted_descr_counts,
+            inference_retweeted_descr_counts
+        )
+        batch_size = 512
+        inference_loader = torch.utils.data.DataLoader(dataset=inference_set, batch_size=batch_size, shuffle=True)
+
+        return inference_loader
+
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        inference_loader = self._create_dataset(user_tweet_df)
+
+        predicted_authors = []
+        predicted_types = []
+        name_list = []
+        for data in inference_loader:
+            # Get the data from the loader
+            two, three, four, five, six, seven, eight, nine, ID, names = data
+
+            # Move it to the GPUs
+            # one = one.to(device)
+            two = two.to(self._device)
+            three = three.to(self._device)
+            four = four.to(self._device)
+            five = five.to(self._device)
+            six = six.to(self._device)
+            seven = seven.to(self._device)
+            eight = eight.to(self._device)
+            nine = nine.to(self._device)
+
+            # Run it through the model
+            author_prediction = self._ensemble_model_v2_1(two, three,
+                                                          four, five, six,
+                                                          seven, eight, nine)
+            type_prediction = self._ensemble_model_v2_2(two, three,
+                                                        four, five, six,
+                                                        seven, eight, nine)
+
+            # Convert these probabilities to the label prediction
+            predicted_authors.extend(np.argmax(author_prediction.cpu().data.numpy(), axis=1).tolist())
+            predicted_types.extend(np.argmax(type_prediction.cpu().data.numpy(), axis=1).tolist())
+
+            # Storing names
+            name_list.extend(names)
+
+        result_df = pd.DataFrame({
+            'predicted_author': predicted_authors,
+            'predicted_type': predicted_types
+        })
+
+        result_df['predicted_author'] = result_df['predicted_author'].replace({0: 'feed based',
+                                                                               1: 'individual',
+                                                                               2: 'organization'})
+        result_df['predicted_type'] = result_df['predicted_type'].replace({0: 'civic/public sector',
+                                                                           1: 'distribution',
+                                                                           2: 'em',
+                                                                           3: 'media',
+                                                                           4: 'personalized'})
+        result_df['screen_name'] = name_list
+        result_df.head()

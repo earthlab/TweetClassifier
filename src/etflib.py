@@ -14,9 +14,9 @@ import scipy.stats
 
 class TweetFilter(object):
     def __init__(self):
-        self.input_dir = os.path.join(et.io.HOME, 'data', 'etf', 'train')
-        self.data_dir = os.path.join(et.io.HOME, 'Dropbox', 'etf', 'data')
-        self.output_dir = os.path.join(et.io.HOME, 'data', 'etf', 'out')
+        self.input_dir = os.path.join(et.io.HOME, '../data', 'etf', 'train')
+        self.data_dir = os.path.join(et.io.HOME, 'Dropbox', 'etf', '../data')
+        self.output_dir = os.path.join(et.io.HOME, '../data', 'etf', 'out')
 
         self.client = tweepy.Client(bearer_token=config.BEARER_TOKEN)
 
