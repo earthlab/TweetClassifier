@@ -459,7 +459,7 @@ class Base:
         self._n_char = len(self._all_chars)
         self._fasttext_model = self._get_read_fasttext()
 
-        self._device = None
+        self._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     @staticmethod
     def _get_read_fasttext():
