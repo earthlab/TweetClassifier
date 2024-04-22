@@ -32,7 +32,7 @@ from src.utils import clean_tweet
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-PROJ_DIR = os.path.dirname(__file__)
+PROJ_DIR = os.path.dirname(os.path.dirname(__file__))
 MODEL_DIR = os.path.join(PROJ_DIR, 'data', 'models')
 
 NUMERIC_COLUMNS = ['u_followers_count', 'following',
