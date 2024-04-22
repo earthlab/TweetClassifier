@@ -143,7 +143,7 @@ class TrainDataset(torch.utils.data.Dataset):
 
         # Getting all the different features
         x_numeric = self.train_numbers[column_id]
-        x_sn = self.train_screennames[:, column_id, :]
+        x_sn = self.train_screen_names[:, column_id, :]
         x_un = self.train_u_names[:, column_id, :]
         x_descr = self.train_u_descriptions[:, column_id, :]
         x_tweet_words = self.train_tweet_word_counts[column_id]
