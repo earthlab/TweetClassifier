@@ -589,10 +589,12 @@ class Base:
         # Centering and scaling the data
         # If it's the train set, fitting a new data transformer and using it
         if data_type == 'train':
+            print('train', numeric_features.shape)
             standardizer = MinMaxScaler()
             scaled_numeric_features = standardizer.fit_transform(numeric_features)
         # If it's validation data, only use the predefined data transformer
         elif data_type == 'validation':
+            print('val', numeric_features.shape)
             scaled_numeric_features = standardizer.transform(numeric_features)
         else:
             print('Incorrect data_type argument, please use (1) train or (2) validation')
@@ -823,6 +825,9 @@ class TrainBase(Base):
         train_df = user_tweet_df[user_tweet_df['set'] == 'train']
         cv_df = user_tweet_df[user_tweet_df['set'] == 'validation']
 
+        print('tcc', len(train_df.columns))
+        print('ccc', len(cv_df.columns))
+
         # Getting all the types of multi-word text data
         normal_tweets = train_df['condensed_tweets'].fillna('').astype(str).values
         quoted_tweets = train_df['quoted_tweets'].fillna('').astype(str).values
@@ -845,6 +850,9 @@ class TrainBase(Base):
 
         train_retweet_counts = np.asarray(train_retweet_counts).reshape(len(train_df), 1)
         validation_retweet_counts = np.asarray(validation_retweet_counts).reshape(len(cv_df), 1)
+
+        print('trc', train_retweet_counts.shape)
+        print('vrc', validation_retweet_counts.shape)
 
         train_numbers, number_scaler = self._get_numeric(train_df, 'train', 'dont matter',
                                                          True, train_retweet_counts)
