@@ -54,17 +54,10 @@ def save_lda_model():
 
     tweet_term_matrix = [reloaded_dict.doc2bow(tweet) for tweet in tweet_tokens]
 
-    corpus_dir = os.path.join(PROJ_DIR, 'data', 'models', 'lda_corpus')
-    os.makedirs(corpus_dir, exist_ok=True)
-
-    ShardedCorpus.serialize(os.path.join(corpus_dir, 'corpus.shdat'), tweet_term_matrix,
-                            shardsize=2048, dim=len(dictionary),
-                            sparse_serialization=True, sparse_retrieval=True)
-
     # Creating the object for LDA model using gensim library
     lda = gensim.models.ldamulticore.LdaMulticore
 
-    # Running and Trainign LDA model on the document term matrix.
+    # Running and Training LDA model on the document term matrix.
     lda_model = lda(tweet_term_matrix, num_topics=50,
                     id2word=dictionary, passes=50, workers=72)
 

@@ -5,7 +5,6 @@ import re
 import gensim
 from gensim import corpora
 import numpy as np
-from gensim.corpora.sharded_corpus import ShardedCorpus
 import multiprocessing
 from src.utils import clean_tweet
 
@@ -16,7 +15,6 @@ PROJ_DIR = os.path.dirname(os.path.dirname(__file__))
 class LDA:
     def __init__(self):
         self._dictionary_path = os.path.join(PROJ_DIR, 'data', 'models', 'dictionary.dict')
-        self._sharded_corpus_dest = os.path.join(PROJ_DIR, 'data', 'models', 'lda_corpus', 'corpus.shdat')
         self._lda_model_path = os.path.join(PROJ_DIR, 'data', 'models', 'LDA_model')
 
     @staticmethod
