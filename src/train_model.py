@@ -461,8 +461,8 @@ class Base:
 
     @staticmethod
     def _get_read_fasttext():
-        fasttext_dir = os.path.join(PROJ_DIR, '../data', 'models')
-        fasttext_path = os.path.join(PROJ_DIR, '../data', 'models', 'wiki-news-300d-1M.vec')
+        fasttext_dir = os.path.join(PROJ_DIR, 'data', 'models')
+        fasttext_path = os.path.join(PROJ_DIR, 'data', 'models', 'wiki-news-300d-1M.vec')
 
         # download pre-trained vector if necessary
         # link from https://fasttext.cc/docs/en/supervised-models.html
