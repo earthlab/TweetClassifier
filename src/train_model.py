@@ -112,6 +112,9 @@ NUMERIC_COLUMNS = ['u_followers_count', 'following',
                    'screen_name_has_smem', 'screen_name_has_trump']
 
 
+NUMERIC_COLUMNS.extend([str(i) for i in range(0, 50)])
+
+
 class TrainDataset(torch.utils.data.Dataset):
     """
     Characterizes a dataset for PyTorch
@@ -573,10 +576,6 @@ class Base:
 
         # Don't remember why I did this
         numeric_features = df.copy()
-
-        # Adding the topic-model topic columns and adding them to the list
-        topic_columns = [str(i) for i in range(0, 50)]
-        NUMERIC_COLUMNS.extend(topic_columns)
 
         # Subsetting the dataframe with those columns
         # And converting to numpy array
