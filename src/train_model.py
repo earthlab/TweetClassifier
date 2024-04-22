@@ -711,7 +711,7 @@ class TrainBase(Base):
 
         (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
          self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split(
-            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_with_lda_columns.csv'))
+            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_data_with_lda_columns.csv'))
         )
 
     def _produce_eval(self, model, data_set):
