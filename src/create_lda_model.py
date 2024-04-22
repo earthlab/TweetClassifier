@@ -54,7 +54,10 @@ def save_lda_model():
 
     tweet_term_matrix = [reloaded_dict.doc2bow(tweet) for tweet in tweet_tokens]
 
-    ShardedCorpus.serialize(os.path.join(PROJ_DIR, 'data', 'models', 'corpus.shdat'), tweet_term_matrix,
+    corpus_dir = os.path.join(PROJ_DIR, 'data', 'models', 'lda_corpus')
+    os.makedirs(corpus_dir, exist_ok=True)
+
+    ShardedCorpus.serialize(os.path.join(corpus_dir, 'corpus.shdat'), tweet_term_matrix,
                             shardsize=2048, dim=len(dictionary),
                             sparse_serialization=True, sparse_retrieval=True)
 

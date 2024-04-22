@@ -16,7 +16,7 @@ PROJ_DIR = os.path.dirname(os.path.dirname(__file__))
 class LDA:
     def __init__(self):
         self._dictionary_path = os.path.join(PROJ_DIR, 'data', 'models', 'dictionary.dict')
-        self._sharded_corpus_dest = os.path.join(PROJ_DIR, 'data', 'models', 'corpus.shdat')
+        self._sharded_corpus_dest = os.path.join(PROJ_DIR, 'data', 'models', 'lda_corpus', 'corpus.shdat')
         self._lda_model_path = os.path.join(PROJ_DIR, 'data', 'models', 'LDA_model')
 
     @staticmethod
@@ -100,14 +100,6 @@ class LDA:
 
         dictionary = corpora.Dictionary(tweet_tokens)
         reloaded_dict = dictionary.load(self._dictionary_path)
-
-        # Converting list of tweets (corpus) into a tweet term matrix using dictionary prepared above.
-        tweet_term_matrix = [reloaded_dict.doc2bow(tweet) for tweet in tweet_tokens]
-
-        # To reduce bottlenecks in the parallelized LDA we need a sharded (parallelized) corpus
-        ShardedCorpus.serialize(self._sharded_corpus_dest, tweet_term_matrix,
-                                shardsize=2048, dim=len(dictionary),
-                                sparse_serialization=True, sparse_retrieval=True)
 
         lda = gensim.models.ldamulticore.LdaMulticore
 
