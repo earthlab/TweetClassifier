@@ -460,7 +460,6 @@ class Base:
         self._fasttext_model = self._get_read_fasttext()
 
         self._device = None
-        self._label_column = None
 
     @staticmethod
     def _get_read_fasttext():
@@ -709,11 +708,6 @@ class Base:
 class TrainBase(Base):
     def __init__(self):
         super().__init__()
-
-        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
-         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split(
-            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_data_with_lda_columns.csv'))
-        )
 
     def _produce_eval(self, model, data_set):
         predicted_label_list_y = []
@@ -1053,6 +1047,11 @@ class TrainTweetAuthorModel(TrainBase):
         super().__init__()
         self._label_column = 'u_classv2_1'
 
+        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
+         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split(
+            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_data_with_lda_columns.csv'))
+        )
+
     def output_model(self, l2_value: float, num_epochs: int):
         ensemble = TweetAuthorEnsemble(self._numeric_features, self._text_vectorizer)
         ensemble = nn.DataParallel(ensemble)
@@ -1065,6 +1064,11 @@ class TrainTweetTypeModel(TrainBase):
     def __init__(self):
         super().__init__()
         self._label_column = 'u_classv2_2'
+
+        (self._train_loader, self._train_df, self._validation_loader, self._validation_df, self._numeric_features,
+         self._text_vectorizer, self._zero_to_one_scaler, self._number_scaler) = self._get_test_train_split(
+            pd.read_csv(os.path.join(PROJ_DIR, 'data', 'training', 'training_data_with_lda_columns.csv'))
+        )
 
     def output_model(self, l2_value: float, num_epochs: int):
         ensemble = TweetTypeEnsemble(self._numeric_features, self._text_vectorizer)
