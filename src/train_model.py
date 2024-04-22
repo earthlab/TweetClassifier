@@ -123,7 +123,7 @@ class TrainDataset(torch.utils.data.Dataset):
     def __init__(self, list_ids, train_labels_to_specify, train_numbers, train_screennames, train_u_names,
                  train_u_descriptions, train_tweet_word_counts, train_quoted_word_counts, train_quoted_descr_counts,
                  train_retweeted_descr_counts):
-        self.list_IDs = list_ids
+        self.list_ids = list_ids
         self.train_labels = train_labels_to_specify
         self.train_numbers = train_numbers
         self.train_screen_names = train_screennames
