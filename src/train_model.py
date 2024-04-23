@@ -183,7 +183,7 @@ class ValidationDataset(torch.utils.data.Dataset):
         label = self.list_labels[index]
 
         x_numeric = self.validation_numbers[label]
-        x_sn = self.validation_screennames[:, label, :]
+        x_sn = self.validation_screen_names[:, label, :]
         x_un = self.validation_u_names[:, label, :]
         x_descr = self.validation_u_descriptions[:, label, :]
         x_tweet_words = self.validation_tweet_word_counts[label]
