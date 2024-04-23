@@ -1012,12 +1012,12 @@ class TrainBase(Base):
         cv_fig.set_title('Validation Set')
         cv_fig.set_ylabel('Cross Entropy Loss')
 
-        f.savefig(os.path.join(MODEL_DIR, 'data', 'models', f'{self._label_column}_{l2_value}', f'cross_entropy_{l2_value}.png'))
+        f.savefig(os.path.join(MODEL_DIR, f'{self._label_column}_{l2_value}', f'cross_entropy_{l2_value}.png'))
 
         return model
 
     def output_model(self, model, l2_value: float, num_epochs: int):
-        model_dir = os.path.join(PROJ_DIR, 'data', 'models', f'{self._label_column}_{l2_value}')
+        model_dir = os.path.join(MODEL_DIR, f'{self._label_column}_{l2_value}')
         os.makedirs(model_dir, exist_ok=True)
         print(f'creating dir {model_dir}')
 
