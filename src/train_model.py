@@ -1017,7 +1017,7 @@ class TrainBase(Base):
         return model
 
     def output_model(self, model, l2_value: float, num_epochs: int):
-        model_dir = os.path.join(PROJ_DIR, 'data', 'models' f'{self._label_column}_{l2_value}')
+        model_dir = os.path.join(PROJ_DIR, 'data', 'models', f'{self._label_column}_{l2_value}')
         os.makedirs(model_dir, exist_ok=True)
         print(f'creating dir {model_dir}')
 
