@@ -855,7 +855,7 @@ class TrainBase(Base):
 
         train_df = train_df.reset_index(drop=True)
 
-        no_imbalance_df = self._resample_df(self._resample_df(train_df, 'u_classv2_1'), 'u_classv2_2')
+        no_imbalance_df = self._resample_df(train_df, self._label_column)
 
         train_screen_names = self._pad_text_sequences(train_df, 'screen_name')
         validation_screen_names = self._pad_text_sequences(cv_df, 'screen_name')
@@ -883,8 +883,6 @@ class TrainBase(Base):
                                     train_u_names, train_u_descriptions, train_tweet_word_counts,
                                     train_quoted_word_counts,
                                     train_quoted_descr_counts, train_retweeted_descr_counts)
-
-        print(cv_df.index.tolist())
 
         validation_set = ValidationDataset(cv_df.index.tolist(), validation_labels, validation_numbers,
                                            validation_screen_names, validation_u_names, validation_u_descriptions,
@@ -949,6 +947,8 @@ class TrainBase(Base):
 
                 # Run it through the model
                 prediction = model(one, two, three, four, five, six, seven, eight)
+
+                print(prediction, true_y)
 
                 # Computing and storing losses
                 loss = loss_function(prediction,
