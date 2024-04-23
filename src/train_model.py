@@ -111,7 +111,6 @@ NUMERIC_COLUMNS = ['u_followers_count', 'following',
                    'screen_name_has_governor', 'screen_name_has_vost',
                    'screen_name_has_smem', 'screen_name_has_trump']
 
-
 NUMERIC_COLUMNS.extend([str(i) for i in range(0, 50)])
 
 
@@ -816,7 +815,9 @@ class TrainBase(Base):
         user_tweet_df.u_description = user_tweet_df.u_description.fillna('')
 
         train_df = user_tweet_df[user_tweet_df['set'] == 'train']
+        train_df.reset_index()
         cv_df = user_tweet_df[user_tweet_df['set'] == 'validation']
+        cv_df.reset_index()
 
         print('tcc', len(train_df.columns))
         print('ccc', len(cv_df.columns))
@@ -882,6 +883,9 @@ class TrainBase(Base):
                                     train_u_names, train_u_descriptions, train_tweet_word_counts,
                                     train_quoted_word_counts,
                                     train_quoted_descr_counts, train_retweeted_descr_counts)
+
+        print(cv_df.index.tolist())
+
         validation_set = ValidationDataset(cv_df.index.tolist(), validation_labels, validation_numbers,
                                            validation_screen_names, validation_u_names, validation_u_descriptions,
                                            validation_tweet_word_counts, validation_quoted_word_counts,
@@ -956,6 +960,7 @@ class TrainBase(Base):
                 loss.backward()
                 optimizer.step()
 
+            print('A')
             for cv_data in self._validation_loader:
                 # Get the data from the loader
                 cv_one, cv_two, cv_three, cv_four, cv_five, cv_six, cv_seven, cv_eight, cv_nine, _ = cv_data
