@@ -815,9 +815,9 @@ class TrainBase(Base):
         user_tweet_df.u_description = user_tweet_df.u_description.fillna('')
 
         train_df = user_tweet_df[user_tweet_df['set'] == 'train']
-        train_df.reset_index()
+        train_df.reset_index(inplace=True)
         cv_df = user_tweet_df[user_tweet_df['set'] == 'validation']
-        cv_df.reset_index()
+        cv_df.reset_index(inplace=True)
 
         print('tcc', len(train_df.columns))
         print('ccc', len(cv_df.columns))
