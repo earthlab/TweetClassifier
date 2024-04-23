@@ -1064,7 +1064,7 @@ class TrainTweetAuthorModel(TrainBase):
         ensemble = nn.DataParallel(ensemble)
         ensemble.to(self._device)
 
-        super()._train_model(ensemble, l2_value, num_epochs)
+        super().output_model(ensemble, l2_value, num_epochs)
 
 
 class TrainTweetTypeModel(TrainBase):
@@ -1082,7 +1082,7 @@ class TrainTweetTypeModel(TrainBase):
         ensemble = nn.DataParallel(ensemble)
         ensemble.to(self._device)
 
-        super()._train_model(ensemble, l2_value, num_epochs)
+        super().output_model(ensemble, l2_value, num_epochs)
 
 
 class InferenceTweetAuthorModel(Base):
