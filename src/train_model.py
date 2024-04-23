@@ -1012,12 +1012,13 @@ class TrainBase(Base):
         cv_fig.set_title('Validation Set')
         cv_fig.set_ylabel('Cross Entropy Loss')
 
-        f.savefig(os.path.join(MODEL_DIR, f'cross_entropy_{l2_value}.png'))
+        f.savefig(os.path.join(MODEL_DIR, 'data', 'models', f'{self._label_column}_{l2_value}, '
+                                                            f''f'cross_entropy_{l2_value}.png'))
 
         return model
 
     def output_model(self, model, l2_value: float, num_epochs: int):
-        model_dir = os.path.join(PROJ_DIR, f'{self._label_column}_{l2_value}')
+        model_dir = os.path.join(PROJ_DIR, 'data', 'models' f'{self._label_column}_{l2_value}')
         os.makedirs(model_dir, exist_ok=True)
 
         dump(self._text_vectorizer, os.path.join(model_dir, f'text_vectorizer-{self._label_column}-{l2_value}.joblib'))
@@ -1031,6 +1032,7 @@ class TrainBase(Base):
         ) = self._grid_search(model, l2_value, num_epochs)
 
         torch.save(trained_model, os.path.join(model_dir, f'trained-model-{self._label_column}-{l2_value}.pt'))
+        print(f"saved to {os.path.join(model_dir, f'trained-model-{self._label_column}-{l2_value}.pt')}")
 
         with open(os.path.join(model_dir, f'{self._label_column}-{l2_value}-train-metrics.txt'), 'w+') as f:
             f.write('Confusion Matrix:\n')
