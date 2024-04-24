@@ -729,11 +729,11 @@ class TrainBase(Base):
 
         if data_set == 'train':
             loader = self._train_loader
-            predictions_matrix_y = np.zeros((len(self._train_df), 3))
+            predictions_matrix_y = np.zeros((len(self._train_df), 3 if self._label_column == 'u_classv2_1' else 7))
             ordered_labels_y = np.zeros((len(self._train_df), 1))
         elif data_set == 'cv':
             loader = self._validation_loader
-            predictions_matrix_y = np.zeros((len(self._validation_df), 3))
+            predictions_matrix_y = np.zeros((len(self._validation_df), 3 if self._label_column == 'u_classv2_1' else 7))
             ordered_labels_y = np.zeros((len(self._validation_df), 1))
         else:
             raise ValueError('Invalid data set. Please use (1) train or (2) cv')
