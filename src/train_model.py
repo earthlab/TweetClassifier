@@ -385,7 +385,7 @@ class TweetTypeEnsemble(nn.Module):
 
         # Part10. Ensemble
         self.ensemble_layer = nn.Sequential(
-            nn.Linear(40, 7, bias=False),
+            nn.Linear(56, 7, bias=False),
             nn.Tanh())
 
         # Part11. User (re)tweet component - for "skip connection"
