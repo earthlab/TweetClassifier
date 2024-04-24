@@ -350,47 +350,47 @@ class TweetTypeEnsemble(nn.Module):
 
         # Part2. Numerical component
         self.numeric_layer = nn.Sequential(
-            nn.Linear(numeric_features.shape[1], 5, bias=False),
+            nn.Linear(numeric_features.shape[1], 7, bias=False),
             nn.Tanh())
 
         # Part3. User name component
         #        PyTorch LSTM already has a tanh
-        self.uname_lstm_layer = nn.LSTM(90, 5, num_layers=1, bias=False)
+        self.uname_lstm_layer = nn.LSTM(90, 7, num_layers=1, bias=False)
 
         # Part4. Screen name component
-        self.screenname_lstm_layer = nn.LSTM(90, 5, num_layers=1, bias=False)
+        self.screenname_lstm_layer = nn.LSTM(90, 7, num_layers=1, bias=False)
 
         # Part5. Description component
-        self.descr_lstm_layer = nn.LSTM(300, 5, num_layers=1, bias=False)
+        self.descr_lstm_layer = nn.LSTM(300, 7, num_layers=1, bias=False)
 
         # Part6. User (re)tweet component - for ensembling
         self.tweet_layer_ensemble = torch.nn.Sequential(
-            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Linear(len(text_vectorizer.vocabulary_), 7, bias=False),
             nn.Tanh())
 
         # Part7. Quoted tweet component
         self.quoted_tweet_layer = torch.nn.Sequential(
-            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Linear(len(text_vectorizer.vocabulary_), 7, bias=False),
             nn.Tanh())
 
         # Part8. Quoted description component
         self.quoted_descr_layer = torch.nn.Sequential(
-            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Linear(len(text_vectorizer.vocabulary_), 7, bias=False),
             nn.Tanh())
 
         # Part9. Retweeted description component
         self.retweet_descr_layer = torch.nn.Sequential(
-            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=False),
+            nn.Linear(len(text_vectorizer.vocabulary_), 7, bias=False),
             nn.Tanh())
 
         # Part10. Ensemble
         self.ensemble_layer = nn.Sequential(
-            nn.Linear(40, 5, bias=False),
+            nn.Linear(40, 7, bias=False),
             nn.Tanh())
 
         # Part11. User (re)tweet component - for "skip connection"
         self.tweet_layer_skip = torch.nn.Sequential(
-            nn.Linear(len(text_vectorizer.vocabulary_), 5, bias=True),
+            nn.Linear(len(text_vectorizer.vocabulary_), 7, bias=True),
             nn.Sigmoid())
 
     # Forward pass method
@@ -459,6 +459,20 @@ class Base:
         self._fasttext_model = self._get_read_fasttext()
 
         self._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        self._int_to_tweet_author = {0: 'feedbased', 1: 'individual', 2: 'organization'}
+        self._tweet_author_to_int = {v: k for k, v in self._int_to_tweet_author.items()}
+
+        self._int_to_tweet_type = {
+            0: 'public sector',
+            1: 'distribution',
+            2: 'em',
+            3: 'media',
+            4: 'personalized',
+            5: 'nonprofit',
+            6: 'tribal'
+        }
+        self._tweet_type_to_int = {v: k for k, v in self._int_to_tweet_type.items()}
 
     @staticmethod
     def _get_read_fasttext():
@@ -794,18 +808,9 @@ class TrainBase(Base):
         user_tweet_df = user_tweet_df.append(validation_user_tweet_df, sort=True)
         user_tweet_df = user_tweet_df.reset_index(drop=True)
 
-        user_tweet_df['u_classv2_1'] = user_tweet_df['u_classv2_1'].replace({'feedbased': 'feed based'})
-        user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'em expertise': 'em'})
         user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'em related': 'em'})
-        user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].replace({'polarizing': 'distribution'})
-        user_tweet_df = user_tweet_df[user_tweet_df['u_classv2_2'] != 'protected']
-
-        pandas_cat_1 = pd.Categorical(user_tweet_df['u_classv2_1'])
-        user_tweet_df['u_classv2_1'] = pandas_cat_1.codes
-
-        pandas_cat_2 = pd.Categorical(user_tweet_df['u_classv2_2'])
-        user_tweet_df['u_classv2_2'] = pandas_cat_2.codes
-        print(pandas_cat_2.codes)
+        user_tweet_df['u_classv2_1'] = user_tweet_df['u_classv2_1'].map(self._tweet_author_to_int)
+        user_tweet_df['u_classv2_2'] = user_tweet_df['u_classv2_2'].map(self._tweet_type_to_int)
         pd.set_option('display.max_colwidth', -1)
 
         user_tweet_df = self._add_boolean_columns_to_df(user_tweet_df)
@@ -1173,13 +1178,7 @@ class InferenceTweetAuthorModel(Base):
             'predicted_type': predicted_types
         })
 
-        result_df['predicted_author'] = result_df['predicted_author'].replace({0: 'feed based',
-                                                                               1: 'individual',
-                                                                               2: 'organization'})
-        result_df['predicted_type'] = result_df['predicted_type'].replace({0: 'civic/public sector',
-                                                                           1: 'distribution',
-                                                                           2: 'em',
-                                                                           3: 'media',
-                                                                           4: 'personalized'})
+        result_df['predicted_author'] = result_df['predicted_author'].map(self._int_to_tweet_author)
+        result_df['predicted_type'] = result_df['predicted_type'].map(self._int_to_tweet_type)
         result_df['screen_name'] = name_list
         result_df.head()
