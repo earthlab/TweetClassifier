@@ -805,7 +805,7 @@ class TrainBase(Base):
 
         pandas_cat_2 = pd.Categorical(user_tweet_df['u_classv2_2'])
         user_tweet_df['u_classv2_2'] = pandas_cat_2.codes
-
+        print(pandas_cat_2.codes)
         pd.set_option('display.max_colwidth', -1)
 
         user_tweet_df = self._add_boolean_columns_to_df(user_tweet_df)

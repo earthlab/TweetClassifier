@@ -33,6 +33,14 @@ MODEL_DIR = os.path.join(PROJ_PATH, '../model_inputs')
 
 
 
+class TweetAuthorInference:
+    def __init__(self):
+        pass
+
+
+class TweetTypeInference:
+    def __init__(self):
+        pass
 
 
 def main():
