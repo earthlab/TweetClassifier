@@ -1087,6 +1087,18 @@ class InferenceBase(Base):
         self._ensemble_model = None
 
     def _create_dataset(self, user_tweet_df: pd.DataFrame):
+        # Optionally, you can reset the index of the resulting dataframes
+        user_tweet_df.reset_index(drop=True, inplace=True)
+
+        user_tweet_df = user_tweet_df.drop('Unnamed: 0', axis=1)
+        user_tweet_df = user_tweet_df.reset_index(drop=True)
+
+        user_tweet_df = self._add_boolean_columns_to_df(user_tweet_df)
+
+        user_tweet_df = user_tweet_df.dropna(subset=NUMERIC_COLUMNS)
+        user_tweet_df = user_tweet_df.assign(has_description=1. - 1 * pd.isnull(user_tweet_df['u_description']))
+        user_tweet_df.u_description = user_tweet_df.u_description.fillna('')
+
         (inference_retweet_counts, inference_tweet_word_counts, inference_quoted_word_counts,
          inference_retweeted_descr_counts, inference_quoted_descr_counts) = self._create_one_hot_encodings(
             user_tweet_df, self._text_vectorizer)
@@ -1098,17 +1110,15 @@ class InferenceBase(Base):
 
         user_tweet_df = user_tweet_df.reset_index(drop=True)
 
-        inference_screen_names = self._pad_text_sequences(user_tweet_df, 'screen_name')
-        inference_u_names = self._pad_text_sequences(user_tweet_df, 'u_name')
-        inference_u_descriptions = self._pad_text_sequences(user_tweet_df, 'u_description')
+        # there is only one row of input so don't need to pad text sequences
 
         inference_set = InferenceDataset(
             user_tweet_df,
             range(len(user_tweet_df)),
             inference_numbers,
-            inference_screen_names,
-            inference_u_names,
-            inference_u_descriptions,
+            user_tweet_df['screen_name'],
+            user_tweet_df['u_name'],
+            user_tweet_df['u_description'],
             inference_tweet_word_counts,
             inference_quoted_word_counts,
             inference_quoted_descr_counts,
