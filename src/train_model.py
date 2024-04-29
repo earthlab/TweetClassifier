@@ -1004,7 +1004,7 @@ class TrainBase(Base):
             f.write(validation_class_specifics)
 
 
-class TrainTweetAuthorModel(TrainBase):
+class TrainTweetTypeModel(TrainBase):
     def __init__(self):
         super().__init__()
         self._label_column = 'u_classv2_1'
@@ -1022,7 +1022,7 @@ class TrainTweetAuthorModel(TrainBase):
         super().output_model(ensemble, l2_value, num_epochs)
 
 
-class TrainTweetTypeModel(TrainBase):
+class TrainTweetRoleModel(TrainBase):
     def __init__(self):
         super().__init__()
         self._label_column = 'u_classv2_2'

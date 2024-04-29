@@ -118,7 +118,7 @@ class TweetFilter(object):
                 expansions=['author_id',
                             'referenced_tweets.id.author_id',
                             'referenced_tweets.id'],
-                limit=2
+                limit=1
             )
         except tweepy.errors.TweepyException as e:
             # return(num_tweets)
@@ -449,17 +449,3 @@ class TweetFilter(object):
 
         users_df = users_df.reset_index(drop=True)
         return users_df
-
-    # def etf_user_timeline_batch_extract_apiv2(self, users_input):
-    #
-    #     users_df = users_input.copy()
-    #     timelineid = "user_id"  # username field
-    #
-    #     for user_index in range(len(users_input)):
-    #         user_id = users_input.iloc[user_index][timelineid]
-    #         username = users_input.iloc[user_index]["username"]
-    #         print("i={} author_id = {} {}".format(user_index, user_id, username))
-    #         users_df = self.etf_user_timeline_extract_apiv2(user_id, users_df)
-    #     users_df = self.etf_add_extract_columns(users_df)
-    #
-    #     return users_df

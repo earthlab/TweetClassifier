@@ -126,7 +126,7 @@ class InferenceBase(Base):
         return predictions
 
 
-class InferenceAuthor(InferenceBase):
+class InferenceType(InferenceBase):
     def __init__(self):
         super().__init__()
         self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_1.joblib'))
@@ -141,7 +141,7 @@ class InferenceAuthor(InferenceBase):
         return [self._int_to_tweet_author[i] for i in predicted_authors]
 
 
-class InferenceType(InferenceBase):
+class InferenceRole(InferenceBase):
     def __init__(self):
         super().__init__()
         self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_2.joblib'))
