@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from src.model import TrainTweetTypeModel, TrainTweetAuthorModel
+from src.train_model import TrainTweetTypeModel, TrainTweetAuthorModel
 
 
 if __name__ == '__main__':

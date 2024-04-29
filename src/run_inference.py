@@ -1,216 +1,156 @@
 import os
-import string
-import re
-import urllib
-import zipfile
-from collections import OrderedDict
-from operator import itemgetter
-import warnings
 
-warnings.filterwarnings("ignore", category=UserWarning)
-# data science
+from src.train_model import MODEL_DIR, NUMERIC_COLUMNS, Base
+
 import pandas as pd
 import numpy as np
-# nlp
-from gensim.models import KeyedVectors
-from gensim.parsing.preprocessing import remove_stopwords
-# machine learning
 import torch
-import torch.nn as nn
 from torch.autograd import Variable
-import torchvision.transforms as transforms
-from PIL import Image
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.preprocessing import MinMaxScaler
-# from livelossplot import PlotLosses
-# earthpy
-# plotting
 from joblib import load
 
-PROJ_PATH = os.path.dirname(__file__)
-DATA_DIR = os.path.join(PROJ_PATH, '../data')
-MODEL_DIR = os.path.join(PROJ_PATH, '../model_inputs')
+
+class InferenceDataset(torch.utils.data.Dataset):
+
+    def __init__(self, tweet_df, list_ids, inference_numbers, inference_screen_names,
+                 inference_u_names, inference_u_description, inference_tweet_word_counts,
+                 inference_quoted_word_counts, inference_quoted_descr_counts, inference_retweeted_descr_count):
+        self.tweet_df = tweet_df
+        self.list_labels = list_ids
+        self.inference_numbers = inference_numbers
+        self.inference_screen_names = inference_screen_names
+        self.inference_u_names = inference_u_names
+        self.inference_u_descriptions = inference_u_description
+        self.inference_tweet_word_counts = inference_tweet_word_counts
+        self.inference_quoted_word_counts = inference_quoted_word_counts
+        self.inference_quoted_descr_counts = inference_quoted_descr_counts
+        self.inference_retweeted_descr_counts = inference_retweeted_descr_count
+
+    def __len__(self):
+        return len(self.list_labels)
+
+    def __getitem__(self, index):
+        # Select sample
+        label = self.list_labels[index]
+
+        x_numeric = self.inference_numbers[label]
+        x_sn = self.inference_screen_names[:, label, :]
+        x_un = self.inference_u_names[:, label, :]
+        x_descr = self.inference_u_descriptions[:, label, :]
+        x_tweet_words = self.inference_tweet_word_counts[label]
+        x_quoted_tweet_words = self.inference_quoted_word_counts[label]
+        x_quoted_descr_words = self.inference_quoted_descr_counts[label]
+        x_retweet_descr_words = self.inference_retweeted_descr_counts[label]
+
+        names = self.tweet_df['screen_name'][label]
+
+        return (x_numeric, x_sn, x_un, x_descr, x_tweet_words,
+                x_quoted_tweet_words, x_quoted_descr_words, x_retweet_descr_words,
+                label, names)
 
 
-
-class TweetAuthorInference:
+class InferenceBase(Base):
     def __init__(self):
-        pass
+        super().__init__()
+        self._text_vectorizer = None
+        self._number_scaler = None
+        self._ensemble_model = None
+
+    def _create_dataset(self, user_tweet_df: pd.DataFrame):
+        # Optionally, you can reset the index of the resulting dataframes
+        user_tweet_df.reset_index(drop=True, inplace=True)
+
+        user_tweet_df = user_tweet_df.drop('Unnamed: 0', axis=1)
+        user_tweet_df = user_tweet_df.reset_index(drop=True)
+
+        user_tweet_df = self._add_boolean_columns_to_df(user_tweet_df)
+
+        user_tweet_df = user_tweet_df.dropna(subset=NUMERIC_COLUMNS)
+        user_tweet_df = user_tweet_df.assign(has_description=1. - 1 * pd.isnull(user_tweet_df['u_description']))
+        user_tweet_df.u_description = user_tweet_df.u_description.fillna('')
+
+        (inference_retweet_counts, inference_tweet_word_counts, inference_quoted_word_counts,
+         inference_retweeted_descr_counts, inference_quoted_descr_counts) = self._create_one_hot_encodings(
+            user_tweet_df, self._text_vectorizer)
+
+        inference_retweet_counts = np.asarray(inference_retweet_counts).reshape(len(user_tweet_df), 1)
+
+        inference_numbers = self._get_numeric(user_tweet_df, 'validation', self._number_scaler,
+                                              True, inference_retweet_counts)
+
+        user_tweet_df = user_tweet_df.reset_index(drop=True)
+
+        # there is only one row of input so don't need to pad text sequences
+
+        inference_set = InferenceDataset(
+            user_tweet_df,
+            range(len(user_tweet_df)),
+            inference_numbers,
+            Variable(self._word_to_tensor(user_tweet_df['screen_name'][0]), requires_grad=False),
+            Variable(self._word_to_tensor(user_tweet_df['u_name'][0]), requires_grad=False),
+            Variable(self._desc_to_tensor(user_tweet_df['u_description'][0]), requires_grad=False),
+            inference_tweet_word_counts,
+            inference_quoted_word_counts,
+            inference_quoted_descr_counts,
+            inference_retweeted_descr_counts
+        )
+        batch_size = 512
+        inference_loader = torch.utils.data.DataLoader(dataset=inference_set, batch_size=batch_size, shuffle=True)
+
+        return inference_loader
+
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        inference_loader = self._create_dataset(user_tweet_df)
+
+        predictions = []
+        for data in inference_loader:
+            # Get the data from the loader
+            two, three, four, five, six, seven, eight, nine, ID, names = data
+
+            # Move it to the GPUs
+            # one = one.to(device)
+            two = two.to(self._device)
+            three = three.to(self._device)
+            four = four.to(self._device)
+            five = five.to(self._device)
+            six = six.to(self._device)
+            seven = seven.to(self._device)
+            eight = eight.to(self._device)
+            nine = nine.to(self._device)
+
+            # Run it through the model
+            prediction = self._ensemble_model(two, three, four, five, six, seven, eight, nine)
+
+            # Convert these probabilities to the label prediction
+            predictions.extend(np.argmax(prediction.cpu().data.numpy(), axis=1).tolist())
+
+        return predictions
 
 
-class TweetTypeInference:
+class InferenceAuthor(InferenceBase):
     def __init__(self):
-        pass
+        super().__init__()
+        self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_1.joblib'))
+        self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_1.joblib'))
+        self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_1.joblib'))
+        self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_1.pt'),
+                                          map_location=self._device)
+
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        predicted_authors = super().run_inference(user_tweet_df)
+
+        return [self._int_to_tweet_author[i] for i in predicted_authors]
 
 
-def main():
+class InferenceType(InferenceBase):
+    def __init__(self):
+        super().__init__()
+        self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_2.joblib'))
+        self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_2.joblib'))
+        self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_2.joblib'))
+        self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_2.pt'),
+                                          map_location=self._device)
 
-    output_file = os.path.join(DATA_DIR, 'test_results_tweets_unimodal.csv')
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        predicted_types = super().run_inference(user_tweet_df)
 
-    user_tweet_df = pd.read_csv(os.path.join(DATA_DIR, 'PROTO_merged.csv'))
-
-
-
-    class validation_Dataset(torch.utils.data.Dataset):
-        'Characterizes a dataset for PyTorch'
-
-        def __init__(self, list_IDs):
-            'Initialization'
-            self.list_IDs = list_IDs
-
-        def __len__(self):
-            'Denotes the total number of samples'
-            return len(self.list_IDs)
-
-        def __getitem__(self, index):
-            'Generates one sample of data'
-            # Select sample
-            ID = self.list_IDs[index]
-
-            # Getting all the different features
-            # x_image = validation_images[ID]
-            x_numeric = validation_numbers[ID]
-            x_sn = validation_screennames[:, ID, :]
-            x_un = validation_u_names[:, ID, :]
-            x_descr = validation_u_descriptions[:, ID, :]
-            x_tweet_words = validation_tweet_word_counts[ID]
-            x_quoted_tweet_words = validation_quoted_word_counts[ID]
-            x_quoted_descr_words = validation_quoted_descr_counts[ID]
-            x_retweet_descr_words = validation_retweeted_descr_counts[ID]
-
-            # Storing user name
-            names = user_tweet_df['screen_name'][ID]
-
-            return (x_numeric, x_sn, x_un, x_descr, x_tweet_words,
-                    x_quoted_tweet_words, x_quoted_descr_words, x_retweet_descr_words,
-                    ID, names)
-
-    validation_set = validation_Dataset(range(len(user_tweet_df)))
-
-    batch_size = 512
-
-    validation_loader = torch.utils.data.DataLoader(dataset=validation_set,
-                                                    batch_size=batch_size,
-                                                    shuffle=True)
-
-    if torch.cuda.is_available():
-        # Use the first available GPU
-        device = torch.device("cuda:0")
-        print("Using GPU:", torch.cuda.get_device_name(0))
-    else:
-        # Use CPU if GPUs are not available
-        device = torch.device("cpu")
-        print("Using CPU")
-
-    ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=device)
-    ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=device)
-
-    print('loaded models')
-
-    predicted_authors = []
-    predicted_type = []
-    name_list = []
-
-    loader = validation_loader
-    for data in loader:
-
-        # Get the data from the loader
-        two, three, four, five, six, seven, eight, nine, ID, names = data
-
-        # Move it to the GPUs
-        # one = one.to(device)
-        two = two.to(device)
-        three = three.to(device)
-        four = four.to(device)
-        five = five.to(device)
-        six = six.to(device)
-        seven = seven.to(device)
-        eight = eight.to(device)
-        nine = nine.to(device)
-
-        # Run it through the model
-        prediction = ensemble_model_v2_1(two, three,
-                                         four, five, six,
-                                         seven, eight, nine)
-
-        # Convert these probabilities to the label prediction
-        prediction_array = prediction.cpu().data.numpy()
-        predicted_label = np.argmax(prediction_array, axis=1).tolist()
-        predicted_label_list_y.extend(predicted_label)
-
-        # Storing names
-        name_list.extend(names)
-
-    hat_df1 = pd.DataFrame({'predicted_y1_redone': predicted_label_list_y})
-    hat_df1['screen_name'] = name_list
-    hat_df1['predicted_y1_redone'] = hat_df1['predicted_y1_redone'].replace({0: 'feed based',
-                                                                             1: 'individual',
-                                                                             2: 'organization'})
-    hat_df1.head()
-
-    predicted_label_list_y = []
-    name_list = []
-
-    loader = validation_loader
-    predictions_matrix_y = np.zeros((len(user_tweet_df), 5))
-    ordered_labels_y = np.zeros((len(user_tweet_df), 1))
-
-    for data in loader:
-
-        # Get the data from the loader
-        two, three, four, five, six, seven, eight, nine, ID, names = data
-
-        # Move it to the GPUs
-        # one = one.to(device)
-        two = two.to(device)
-        three = three.to(device)
-        four = four.to(device)
-        five = five.to(device)
-        six = six.to(device)
-        seven = seven.to(device)
-        eight = eight.to(device)
-        nine = nine.to(device)
-
-        # Run it through the model
-        prediction = ensemble_model_v2_2(two, three,
-                                         four, five, six,
-                                         seven, eight, nine)
-
-        # Convert these probabilities to the label prediction
-        prediction_array = prediction.cpu().data.numpy()
-        predicted_label = np.argmax(prediction_array, axis=1).tolist()
-        predicted_label_list_y.extend(predicted_label)
-
-        # Storing IDs for data set inspection
-        ID_list_temp = ID.cpu().data.numpy().tolist()
-        ID_list.extend(ID_list_temp)
-
-        # Storing names
-        name_list.extend(names)
-
-        id_count = 0
-        for i in ID_list_temp:
-            predictions_matrix_y[i, :] = prediction_array[id_count]
-            ordered_labels_y[i, :] = predicted_label[id_count]
-            id_count += 1
-
-    hat_df2 = pd.DataFrame({'predicted_y2_redone': predicted_label_list_y})
-    hat_df2['screen_name'] = name_list
-    hat_df2['predicted_y2_redone'] = hat_df2['predicted_y2_redone'].replace({0: 'civic/public sector',
-                                                                             1: 'distribution',
-                                                                             2: 'em',
-                                                                             3: 'media',
-                                                                             4: 'personalized'})
-    hat_df2.head()
-
-    hat_df = pd.merge(hat_df1, hat_df2, on='screen_name')
-    hat_df.head()
-
-    total_df = pd.merge(hat_df, user_tweet_df, on='screen_name')
-    total_df.head()
-
-    total_df.to_csv(output_file)
-
-
-if __name__ == '__main__':
-    main()
+        return [self._int_to_tweet_type[i] for i in predicted_types]
