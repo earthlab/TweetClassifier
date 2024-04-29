@@ -1079,19 +1079,12 @@ class TrainTweetTypeModel(TrainBase):
         super().output_model(ensemble, l2_value, num_epochs)
 
 
-class InferenceTweetAuthorModel(Base):
+class InferenceBase(Base):
     def __init__(self):
         super().__init__()
-        number_scaler_file = os.path.join(MODEL_DIR, 'number_scaler.joblib')
-        self._zero_to_one_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler.joblib'))
-        ensemble_model_file_v2_1 = os.path.join(MODEL_DIR, 'trained-model-u_classv2-0.001.pt')
-        ensemble_model_file_v2_2 = os.path.join(MODEL_DIR, 'trained-model-u_classv2-0.001.pt')
-        text_vectorizer_file = os.path.join(MODEL_DIR, 'text_vectorizer.joblib')
-        self._text_vectorizer = load(text_vectorizer_file)
-        self._number_scaler = load(number_scaler_file)
-
-        self._ensemble_model_v2_1 = torch.load(ensemble_model_file_v2_1, map_location=self._device)
-        self._ensemble_model_v2_2 = torch.load(ensemble_model_file_v2_2, map_location=self._device)
+        self._text_vectorizer = None
+        self._number_scaler = None
+        self._ensemble_model = None
 
     def _create_dataset(self, user_tweet_df: pd.DataFrame):
         (inference_retweet_counts, inference_tweet_word_counts, inference_quoted_word_counts,
@@ -1129,9 +1122,7 @@ class InferenceTweetAuthorModel(Base):
     def run_inference(self, user_tweet_df: pd.DataFrame):
         inference_loader = self._create_dataset(user_tweet_df)
 
-        predicted_authors = []
-        predicted_types = []
-        name_list = []
+        predictions = []
         for data in inference_loader:
             # Get the data from the loader
             two, three, four, five, six, seven, eight, nine, ID, names = data
@@ -1148,28 +1139,39 @@ class InferenceTweetAuthorModel(Base):
             nine = nine.to(self._device)
 
             # Run it through the model
-            author_prediction = self._ensemble_model_v2_1(two, three,
-                                                          four, five, six,
-                                                          seven, eight, nine)
-            type_prediction = self._ensemble_model_v2_2(two, three,
-                                                        four, five, six,
-                                                        seven, eight, nine)
+            prediction = self._ensemble_model(two, three, four, five, six, seven, eight, nine)
 
             # Convert these probabilities to the label prediction
-            predicted_authors.extend(np.argmax(author_prediction.cpu().data.numpy(), axis=1).tolist())
-            predicted_types.extend(np.argmax(type_prediction.cpu().data.numpy(), axis=1).tolist())
+            predictions.extend(np.argmax(prediction.cpu().data.numpy(), axis=1).tolist())
 
-            # Storing names
-            name_list.extend(names)
+        return predictions
 
-        result_df = pd.DataFrame({
-            'predicted_author': predicted_authors,
-            'predicted_type': predicted_types
-        })
 
-        result_df['predicted_author'] = result_df['predicted_author'].map(self._int_to_tweet_author)
-        result_df['predicted_type'] = result_df['predicted_type'].map(self._int_to_tweet_type)
-        result_df['screen_name'] = name_list
-        result_df.head()
+class InferenceAuthor(InferenceBase):
+    def __init__(self):
+        super().__init__()
+        self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_1.joblib'))
+        self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_1.joblib'))
+        self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_1.joblib'))
+        self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_1.pt'),
+                                          map_location=self._device)
 
-        return result_df
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        predicted_authors = super().run_inference(user_tweet_df)
+
+        return [self._int_to_tweet_author[i] for i in predicted_authors]
+
+
+class InferenceType(InferenceBase):
+    def __init__(self):
+        super().__init__()
+        self._number_scaler = load(os.path.join(MODEL_DIR, 'number_scaler_u_classv2_2.joblib'))
+        self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_2.joblib'))
+        self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_2.joblib'))
+        self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_2.pt'),
+                                          map_location=self._device)
+
+    def run_inference(self, user_tweet_df: pd.DataFrame):
+        predicted_types = super().run_inference(user_tweet_df)
+
+        return [self._int_to_tweet_type[i] for i in predicted_types]
