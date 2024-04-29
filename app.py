@@ -1,3 +1,4 @@
+import json
 import os
 
 import pandas as pd
@@ -35,8 +36,17 @@ class Author(db.Model):
             'author_id': self.author_id,
             'username': self.username,
             'contributor_type': self.contributor_type,
-            'contributor_role': self.contributor_role
+            'contributor_role': self.contributor_role,
+            'profile_url': self.get_twitter_profile_url()
         }
+
+    def get_twitter_profile_url(self):
+        if self.username:
+            return f"https://twitter.com/{self.username}"
+        elif self.author_id:
+            return f"https://twitter.com/user_id/{self.author_id}"
+        else:
+            return None
 
 
 with app.app_context():
@@ -151,7 +161,17 @@ def classify_authors():
         response["error"] = "Too Many Requests"
         response["message"] = ("The get users tweets request amount has been exceeded. As many accounts as could be"
                                " classified were, but you will need to call this later to classify the rest of them.")
-        return jsonify(response), 429
+
+        return jsonify(json.loads(json.dumps(response, indent=4))), 429
     else:
         response["message"] = "Request processed successfully."
-        return jsonify(response), 200
+        return jsonify(json.loads(json.dumps(response, indent=4))), 200
+
+
+@app.route('/get_all_classifications')
+def get_all_classifications():
+    response = {
+        'classifications': [a.serialize for a in db.session.query(Author).all()]
+    }
+
+    return jsonify(json.loads(json.dumps(response, indent=4))), 200

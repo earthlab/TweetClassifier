@@ -132,7 +132,6 @@ class TweetFilter(object):
             if page.data is not None:
                 num_tweets += page.meta['result_count']
                 tweets = page.data
-                print(tweets)
 
             if num_tweets == 0:
                 print("Tweets not found: {}".format(user_id))
