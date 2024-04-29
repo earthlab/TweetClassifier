@@ -124,15 +124,23 @@ def classify_authors():
 
     for author in needs_classification:
         if author.tweets_df is not None:
-            print(f'Classifying author: {author.author_id}')
-            tweets_df = pd.read_csv(author.tweets_df)
-            tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
-            tweets_lda_df.columns = [str(c) for c in tweets_lda_df.columns]
+            try:
+                print(f'Classifying author: {author.author_id}')
+                tweets_df = pd.read_csv(author.tweets_df)
+                tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
+                tweets_lda_df.columns = [str(c) for c in tweets_lda_df.columns]
 
-            author.contributor_type = app.type_inference.run_inference(tweets_lda_df)
-            author.contributor_role = app.role_inference.run_inference(tweets_lda_df)
+                contributor_type = app.type_inference.run_inference(tweets_lda_df)
+                if contributor_type:
+                    author.contributor_type = contributor_type[0]
+                contributor_role = app.role_inference.run_inference(tweets_lda_df)
+                if contributor_role:
+                    author.contributor_role = contributor_role[0]
 
-            db.session.commit()
+                db.session.commit()
+
+            except Exception as e:
+                print(str(e))
 
     classifications = [a.serialize() for a in needs_classification + classified]
 
