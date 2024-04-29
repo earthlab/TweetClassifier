@@ -90,14 +90,14 @@ def classify_authors():
 
         if existing_author is None:
             print('New author')
-            new_author = Author(author_id=author['id'], username=author['username'])
-            db.session.add(new_author)
+            existing_author = Author(author_id=author['id'], username=author['username'])
+            db.session.add(existing_author)
             db.session.flush()
-            needs_classification.append(new_author)
+
+        if existing_author.contributor_type is not None and existing_author.contributor_role is not None:
+            classified.append(existing_author)
         else:
-            print('Existing author found')
-            if existing_author.contributor_type is not None and existing_author.contributor_role is not None:
-                classified.append(existing_author)
+            needs_classification.append(existing_author)
 
     db.session.commit()
 
