@@ -49,7 +49,6 @@ with app.app_context():
     app.role_inference = role_inference
     app.lda_model = lda_model
     app.tweepy_client = tweepy.Client(bearer_token=os.environ.get('X_BEARER_TOKEN'))
-    app.tweet_puller = TweetFilter(app.tweepy_client)
     os.makedirs(os.path.join(PROJ_DIR, 'data', 'user_tweet_dfs'), exist_ok=True)
 
 
@@ -111,7 +110,8 @@ def classify_authors():
         if tweets_df_path is None:
             print('Getting tweets')
             try:
-                tweets_df = app.tweet_puller.etf_user_timeline_extract_apiv2(author.author_id, max_results=50)
+                tweet_puller = TweetFilter(app.tweepy_client)
+                tweets_df = tweet_puller.etf_user_timeline_extract_apiv2(author.author_id, max_results=50)
                 tweets_df_path = os.path.join(PROJ_DIR, 'data', 'user_tweet_dfs', f'{author.author_id}.csv')
                 tweets_df.to_csv(tweets_df_path)
                 author.tweets_df = tweets_df_path
