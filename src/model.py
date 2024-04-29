@@ -1171,3 +1171,5 @@ class InferenceTweetAuthorModel(Base):
         result_df['predicted_type'] = result_df['predicted_type'].map(self._int_to_tweet_type)
         result_df['screen_name'] = name_list
         result_df.head()
+
+        return result_df
