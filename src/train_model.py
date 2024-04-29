@@ -600,12 +600,10 @@ class Base:
         # Centering and scaling the data
         # If it's the train set, fitting a new data transformer and using it
         if data_type == 'train':
-            print('train', numeric_features.shape)
             standardizer = MinMaxScaler()
             scaled_numeric_features = standardizer.fit_transform(numeric_features)
         # If it's validation data, only use the predefined data transformer
         elif data_type == 'validation':
-            print('val', numeric_features.shape)
             scaled_numeric_features = standardizer.transform(numeric_features)
         else:
             print('Incorrect data_type argument, please use (1) train or (2) validation')
@@ -824,9 +822,6 @@ class TrainBase(Base):
         cv_df = user_tweet_df[user_tweet_df['set'] == 'validation']
         cv_df.reset_index(inplace=True)
 
-        print('tcc', len(train_df.columns))
-        print('ccc', len(cv_df.columns))
-
         # Getting all the types of multi-word text data
         normal_tweets = train_df['condensed_tweets'].fillna('').astype(str).values
         quoted_tweets = train_df['quoted_tweets'].fillna('').astype(str).values
@@ -849,9 +844,6 @@ class TrainBase(Base):
 
         train_retweet_counts = np.asarray(train_retweet_counts).reshape(len(train_df), 1)
         validation_retweet_counts = np.asarray(validation_retweet_counts).reshape(len(cv_df), 1)
-
-        print('trc', train_retweet_counts.shape)
-        print('vrc', validation_retweet_counts.shape)
 
         train_numbers, number_scaler = self._get_numeric(train_df, 'train', 'dont matter',
                                                          True, train_retweet_counts)
@@ -953,8 +945,6 @@ class TrainBase(Base):
                 # Run it through the model
                 prediction = model(one, two, three, four, five, six, seven, eight)
 
-                print(prediction, true_y)
-
                 # Computing and storing losses
                 loss = loss_function(prediction,
                                      true_y)
@@ -965,7 +955,6 @@ class TrainBase(Base):
                 loss.backward()
                 optimizer.step()
 
-            print('A')
             for cv_data in self._validation_loader:
                 # Get the data from the loader
                 cv_one, cv_two, cv_three, cv_four, cv_five, cv_six, cv_seven, cv_eight, cv_nine, _ = cv_data
