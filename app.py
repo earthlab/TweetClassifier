@@ -121,10 +121,9 @@ def classify_authors():
                 break
 
     for author in needs_classification:
-        print('Skipping')
         tweets_df = pd.read_csv(author.tweets_df)
         tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
-        print(tweets_lda_df.columns)
+        tweets_lda_df.columns = [str(c) for c in tweets_lda_df.columns]
 
         author.contributor_type = app.type_inference.run_inference(tweets_lda_df)
         author.contributor_role = app.role_inference.run_inference(tweets_lda_df)
