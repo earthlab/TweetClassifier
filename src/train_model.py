@@ -473,7 +473,7 @@ class Base:
             tensor[i][0][self._char_to_index(char)] = 1
         return tensor
 
-    def _word_to_tensor(self, word, dim=90):
+    def _word_to_tensor(self, word, dim=300):
         """
         Converts a word to a dense vector representation
 
