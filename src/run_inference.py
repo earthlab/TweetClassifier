@@ -33,9 +33,9 @@ class InferenceDataset(torch.utils.data.Dataset):
         label = self.list_labels[index]
 
         x_numeric = self.inference_numbers[label]
-        x_sn = self.inference_screen_names[:, label, :]
-        x_un = self.inference_u_names[:, label, :]
-        x_descr = self.inference_u_descriptions[:, label, :]
+        x_sn = self.inference_screen_names[label]
+        x_un = self.inference_u_names[label]
+        x_descr = self.inference_u_descriptions[label]
         x_tweet_words = self.inference_tweet_word_counts[label]
         x_quoted_tweet_words = self.inference_quoted_word_counts[label]
         x_quoted_descr_words = self.inference_quoted_descr_counts[label]
