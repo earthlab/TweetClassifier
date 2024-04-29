@@ -91,7 +91,7 @@ def classify_authors():
     needs_classification = []
     classified = []
     for author in authors:
-        existing_author = db.session.query(Author).filter(Author.autohr_id == author['id']).first()
+        existing_author = db.session.query(Author).filter(Author.author_id == author['id']).first()
 
         if existing_author is None:
             new_author = Author(author_id=author['id'], username=author['username'])
