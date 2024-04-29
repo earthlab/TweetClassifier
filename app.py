@@ -109,6 +109,7 @@ def classify_authors():
         tweets_df_path = author.tweets_df
 
         if tweets_df_path is None:
+            print('Getting tweets')
             try:
                 tweets_df = app.tweet_puller.etf_user_timeline_extract_apiv2(author.author_id, max_results=50)
                 tweets_df_path = os.path.join(PROJ_DIR, 'data', 'user_tweet_dfs', f'{author.author_id}.csv')
@@ -119,8 +120,11 @@ def classify_authors():
                 exceeded_requests = True
                 break
 
-        tweets_df = pd.read_csv(tweets_df_path)
+    for author in needs_classification:
+        print('Skipping')
+        tweets_df = pd.read_csv(author.tweets_df)
         tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
+        print(tweets_lda_df.columns)
 
         author.contributor_type = app.type_inference.run_inference(tweets_lda_df)
         author.contributor_role = app.role_inference.run_inference(tweets_lda_df)
