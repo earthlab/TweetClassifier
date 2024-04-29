@@ -74,40 +74,38 @@ def classify_authors():
     users = tweets.includes['users']
 
     # Iterate over the tweets and print tweet text, author ID, and username
-    authors = []
-    for tweet in tweets.data:
-        author_id = tweet.author_id
-
-        # Retrieve user object from includes using author ID
-        for user in users:
-            if user.id == author_id:
-                authors.append({
-                    'id': user.id,
-                    'username': user.username
-                })
+    authors = {}
+    for user in users:
+        if user.id not in authors:
+            authors[user.id] = {
+                'id': user.id,
+                'username': user.username
+            }
 
     # Classify each author
     needs_classification = []
     classified = []
-    for author in authors:
+    for author in authors.values():
         existing_author = db.session.query(Author).filter(Author.author_id == author['id']).first()
 
         if existing_author is None:
+            print('New author')
             new_author = Author(author_id=author['id'], username=author['username'])
             db.session.add(new_author)
             db.session.flush()
             needs_classification.append(new_author)
         else:
+            print('Existing author found')
             if existing_author.contributor_type is not None and existing_author.contributor_role is not None:
                 classified.append(existing_author)
 
     db.session.commit()
 
+    print(needs_classification)
+
     exceeded_requests = False
     for author in needs_classification:
-        tweets_df_path = author.tweets_df
-
-        if tweets_df_path is None:
+        if author.tweets_df is None:
             print('Getting tweets')
             try:
                 tweet_puller = TweetFilter(app.tweepy_client)
@@ -119,16 +117,22 @@ def classify_authors():
             except tweepy.errors.TooManyRequests:
                 exceeded_requests = True
                 break
+        else:
+            print('Tweet df already found')
+
+    print(needs_classification)
 
     for author in needs_classification:
-        tweets_df = pd.read_csv(author.tweets_df)
-        tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
-        tweets_lda_df.columns = [str(c) for c in tweets_lda_df.columns]
+        if author.tweets_df is not None:
+            print(f'Classifying author: {author.author_id}')
+            tweets_df = pd.read_csv(author.tweets_df)
+            tweets_lda_df = app.lda_model.add_lda_columns(tweets_df)
+            tweets_lda_df.columns = [str(c) for c in tweets_lda_df.columns]
 
-        author.contributor_type = app.type_inference.run_inference(tweets_lda_df)
-        author.contributor_role = app.role_inference.run_inference(tweets_lda_df)
+            author.contributor_type = app.type_inference.run_inference(tweets_lda_df)
+            author.contributor_role = app.role_inference.run_inference(tweets_lda_df)
 
-        db.session.commit()
+            db.session.commit()
 
     classifications = [a.serialize() for a in needs_classification + classified]
 
