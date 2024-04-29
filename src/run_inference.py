@@ -43,7 +43,7 @@ class InferenceDataset(torch.utils.data.Dataset):
 
         names = self.tweet_df['screen_name'][label]
 
-        return (x_numeric, x_un, x_sn, x_descr, x_tweet_words,
+        return (x_numeric, x_sn, x_un, x_descr, x_tweet_words,
                 x_quoted_tweet_words, x_quoted_descr_words, x_retweet_descr_words,
                 label, names)
 
@@ -85,9 +85,9 @@ class InferenceBase(Base):
             user_tweet_df,
             range(len(user_tweet_df)),
             inference_numbers,
-            Variable(self._word_to_tensor(user_tweet_df['screen_name'][0]), requires_grad=False),
-            Variable(self._word_to_tensor(user_tweet_df['u_name'][0]), requires_grad=False),
-            Variable(self._desc_to_tensor(user_tweet_df['u_description'][0]), requires_grad=False),
+            Variable(self._word_to_tensor(user_tweet_df['screen_name'][0]), requires_grad=False).unsqueeze(0),
+            Variable(self._word_to_tensor(user_tweet_df['u_name'][0]), requires_grad=False).unsqueeze(0),
+            Variable(self._desc_to_tensor(user_tweet_df['u_description'][0]), requires_grad=False).unsqueeze(0),
             inference_tweet_word_counts,
             inference_quoted_word_counts,
             inference_quoted_descr_counts,
