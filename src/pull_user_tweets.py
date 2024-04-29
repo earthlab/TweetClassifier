@@ -1,6 +1,3 @@
-
-import os
-import earthpy as et
 import pandas as pd
 import re
 import tweepy
