@@ -23,4 +23,4 @@ ENV FLASK_APP=app.py
 ENV X_BEARER_TOKEN=""
 
 # Run app.py when the container launches
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "app:app"]

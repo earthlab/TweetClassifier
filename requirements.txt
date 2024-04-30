@@ -13,3 +13,4 @@ tweepy
 Flask
 Flask-SQLAlchemy
 torchvision==0.4.1
+gunicorn
