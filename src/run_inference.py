@@ -150,9 +150,9 @@ class InferenceRole(InferenceBase):
         self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_2.joblib'))
         self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_2.joblib'))
         self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_2.pt'),
-                                          map_location=self._device)
+                                          map_location=torch.device(self._device))
         if not torch.cuda.is_available():
-            self._ensemble_model = torch.load(self._ensemble_model, map_location=torch.device('cpu'))
+            self._ensemble_model = self._ensemble_model.module.to(torch.device('cpu'))
 
     def run_inference(self, user_tweet_df: pd.DataFrame):
         predicted_types = super().run_inference(user_tweet_df)
