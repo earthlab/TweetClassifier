@@ -135,7 +135,7 @@ class InferenceType(InferenceBase):
         self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_1.pt'),
                                           map_location=torch.device(self._device))
         if not torch.cuda.is_available():
-            self._ensemble_model = torch.load(self._ensemble_model, map_location=torch.device('cpu'))
+            self._ensemble_model = torch.load(self._ensemble_model, map_location='cpu')
 
     def run_inference(self, user_tweet_df: pd.DataFrame):
         predicted_authors = super().run_inference(user_tweet_df)
@@ -150,7 +150,7 @@ class InferenceRole(InferenceBase):
         self._zero_to_one_number_scaler = load(os.path.join(MODEL_DIR, 'zero_to_one_scaler_u_classv2_2.joblib'))
         self._text_vectorizer = load(os.path.join(MODEL_DIR, 'text_vectorizer-u_classv2_2.joblib'))
         self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_2.pt'),
-                                          map_location=torch.device(self._device))
+                                          map_location=self._device)
         if not torch.cuda.is_available():
             self._ensemble_model = torch.load(self._ensemble_model, map_location=torch.device('cpu'))
 
