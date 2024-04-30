@@ -23,4 +23,4 @@ ENV FLASK_APP=app.py
 ENV X_BEARER_TOKEN=""
 
 # Run app.py when the container launches
-CMD ["flask", "run", "--host=0.0.0.0"]
+CMD ["flask", "run", "--host=127.0.0.1"]

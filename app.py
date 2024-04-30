@@ -172,7 +172,7 @@ def classify_authors():
 @app.route('/get_all_authors')
 def get_all_classifications():
     response = {
-        'classifications': [a.serialize for a in db.session.query(Author).all()]
+        'classifications': [a.serialize() for a in db.session.query(Author).all()]
     }
 
     return jsonify(json.loads(json.dumps(response, indent=4))), 200
