@@ -7,9 +7,6 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-# Install Vim
-RUN apt-get update && apt-get install -y vim
-
 RUN rm -rf .git venv venv3.6
 
 # Install any needed dependencies specified in requirements.txt
