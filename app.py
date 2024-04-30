@@ -13,7 +13,7 @@ import tweepy
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data/database.db'
 db = SQLAlchemy(app)
 
 contrib_role = 'civic/public sector', 'distribution', 'em', 'media', 'personalized'
