@@ -4,13 +4,17 @@ FROM python:3.7.3
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
-
-RUN rm -rf .git venv venv3.6
+# Copy just the requirements.txt first to leverage Docker cache
+COPY requirements.txt /app
 
 # Install any needed dependencies specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application files into the container
+COPY . /app
+
+# Remove unnecessary files if needed
+RUN rm -rf .git venv venv3.6
 
 EXPOSE 5000
 
