@@ -135,7 +135,7 @@ class InferenceType(InferenceBase):
         self._ensemble_model = torch.load(os.path.join(MODEL_DIR, 'trained-model-u_classv2_1.pt'),
                                           map_location=torch.device(self._device))
         if not torch.cuda.is_available():
-            self._ensemble_model = torch.load(self._ensemble_model, map_location='cpu')
+            self._ensemble_model = self._ensemble_model.module.to(torch.device('cpu'))
 
     def run_inference(self, user_tweet_df: pd.DataFrame):
         predicted_authors = super().run_inference(user_tweet_df)
