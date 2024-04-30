@@ -13,7 +13,7 @@ import tweepy
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data/database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////app/data/database.db'
 db = SQLAlchemy(app)
 
 contrib_role = 'civic/public sector', 'distribution', 'em', 'media', 'personalized'
@@ -168,7 +168,7 @@ def classify_authors():
         return jsonify(json.loads(json.dumps(response, indent=4))), 200
 
 
-@app.route('/get_all_classifications')
+@app.route('/get_all_authors')
 def get_all_classifications():
     response = {
         'classifications': [a.serialize for a in db.session.query(Author).all()]
