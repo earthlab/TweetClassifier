@@ -1,11 +1,8 @@
 import os
 import pandas as pd
-import string
-import re
 import gensim
 from gensim import corpora
 import numpy as np
-import multiprocessing
 from src.utils import clean_tweet
 
 

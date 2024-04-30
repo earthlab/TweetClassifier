@@ -4,7 +4,6 @@ import pandas as pd
 import gensim
 from gensim import corpora
 import numpy as np
-from gensim.corpora.sharded_corpus import ShardedCorpus
 from src.utils import clean_tweet
 
 PROJ_DIR = os.path.dirname(os.path.dirname(__file__))
