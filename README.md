@@ -6,7 +6,7 @@ The container will cache user classifications in the database and user tweets in
 You will also need an X API V2 bearer token for at least the Basic level of the API. Make sure to update the command below with this bearer token.
 
 ```bash=
-sudo docker container run -v </absolute/path/to/mount/dir>:/app/persistent_data -d -p 5000:5000 -e X_BEARER_TOKEN=<your_x_api_v2_bearer_token> tweet-classifier:latest
+sudo docker container run -v </absolute/path/to/mount/dir>:/app/persistent_data -d -p 5000:5000 -e X_BEARER_TOKEN=<your_x_api_v2_bearer_token> earthlabcu/tweet_classifier:latest
 
 ```
 
